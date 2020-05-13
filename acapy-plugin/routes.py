@@ -6,8 +6,6 @@ from aiohttp import web
 from aiohttp_apispec import docs
 from marshmallow import Schema, fields
 
-from ...core.protocol_registry import ProtocolRegistry
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -34,5 +32,5 @@ async def register(app: web.Application):
     """Register routes."""
 
     app.add_routes([
-        web.post("/hello-world", hello_world)
+        web.post("/acapy-plugin", hello_world)
         ])
