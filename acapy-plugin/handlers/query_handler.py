@@ -1,17 +1,11 @@
-"""Handler for incoming query messages."""
-
 from aries_cloudagent.core.protocol_registry import ProtocolRegistry
 from aries_cloudagent.messaging.base_handler import BaseHandler, BaseResponder, RequestContext
 
 from ..messages.disclose import Disclose
 from ..messages.query import Query
 
-
 class QueryHandler(BaseHandler):
-    """Handler for incoming query messages."""
-
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        """Message handler implementation."""
         self._logger.debug("QueryHandler called with context %s", context)
         assert isinstance(context.message, Query)
 
