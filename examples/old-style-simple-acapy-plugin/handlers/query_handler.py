@@ -10,9 +10,6 @@ from ..messages.query import Query
 
 class QueryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        self._logger.debug("QueryHandler called with context %s", context)
-        assert isinstance(context.message, Query)
-
         registry: ProtocolRegistry = await context.inject(ProtocolRegistry)
         reply = Query(comment=context.message.comment)
         reply.assign_thread_from(context.message)

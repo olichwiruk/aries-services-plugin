@@ -4,3 +4,4 @@ env
 **.egg-info
 .idea/
 .ipynb_checkpoints/
+docs/
