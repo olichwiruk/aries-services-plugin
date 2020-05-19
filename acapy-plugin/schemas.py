@@ -10,6 +10,7 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 
 from marshmallow import fields
+import uuid
 
 PROTOCOL_URL = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/acapy-plugin/1.0"
 
@@ -20,48 +21,50 @@ PROTOCOL_PACKAGE = "acapy-plugin"
 SCHEMAS = f"{PROTOCOL_PACKAGE}.schemas"
 
 MESSAGE_TYPES = {
-    NEW_SCHEMA: f"{SCHEMAS}.NewSchemaClass",
-    SEARCH_SCHEMA: f"{SCHEMAS}.SearchSchemaClass",
+    NEW_SCHEMA: f"{SCHEMAS}.NewSchemaMessage",
+    SEARCH_SCHEMA: f"{SCHEMAS}.SearchSchemaMessage",
 }
 
 NEW_SCHEMA_HANDLER = f"{SCHEMAS}.NewSchemaHandler"
 SEARCH_SCHEMA_HANDLER = f"{SCHEMAS}.SearchSchemaHandler"
 
 
-class NewSchemaClass(AgentMessage):
+class NewSchemaMessage(AgentMessage):
     class Meta:
         handler_class = NEW_SCHEMA_HANDLER
         message_type = NEW_SCHEMA
         schema_class = "NewSchema"
 
-    def __init__(self, *, payload: str = None, **kwargs):
-        super(NewSchemaClass, self).__init__(**kwargs)
+    def __init__(self, payload: str, schema_id: str = None, **kwargs):
+        super(NewSchemaMessage, self).__init__(**kwargs)
         self.payload = payload
+        self.schema_id = schema_id
 
 
 class NewSchema(AgentMessageSchema):
     class Meta:
-        model_class = NewSchemaClass
+        model_class = NewSchemaMessage
 
-    payload = fields.Str(required=False)
+    payload = fields.Str(required=True)
+    schema_id = fields.Str(required=False)
 
 
-class SearchSchemaClass(AgentMessage):
+class SearchSchemaMessage(AgentMessage):
     class Meta:
         handler_class = SEARCH_SCHEMA_HANDLER
         message_type = SEARCH_SCHEMA
         schema_class = "SearchSchema"
 
-    def __init__(self, *, type: str = None, **kwargs):
-        super(SearchSchemaClass, self).__init__(**kwargs)
-        self.type = type
+    def __init__(self, schema_id: str, **kwargs):
+        super(SearchSchemaMessage, self).__init__(**kwargs)
+        self.schema_id = schema_id
 
 
 class SearchSchema(AgentMessageSchema):
     class Meta:
-        model_class = SearchSchemaClass
+        model_class = SearchSchemaMessage
 
-    type = fields.Str(required=False)
+    schema_id = fields.Str(required=True)
 
 
 class NewSchemaHandler(BaseHandler):
@@ -69,11 +72,12 @@ class NewSchemaHandler(BaseHandler):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         self._logger.debug("NewSchemaHandler called with context %s", context)
-        assert isinstance(context.message, NewSchemaClass)
+        assert isinstance(context.message, NewSchemaMessage)
 
-        schema = StorageRecord(type="schema", value=context.message.payload, tags={})
-        await storage.add_record(schema)
-        reply = NewSchemaClass(payload=context.message.payload)
+        record = StorageRecord(type="OCASchema", value=context.message.payload)
+        await storage.add_record(record)
+
+        reply = NewSchemaMessage(payload=record.value, schema_id=record.id)
 
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
@@ -84,13 +88,11 @@ class SearchSchemaHandler(BaseHandler):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         self._logger.debug("SearchSchemaHandler called with context %s", context)
-        assert isinstance(context.message, SearchSchemaClass)
+        assert isinstance(context.message, SearchSchemaMessage)
 
-        reply = await storage.search_records(
-            type_filter=context.message.type
-        ).fetch_all()
+        record = await storage.get_record("OCASchema", context.message.schema_id)
 
-        reply = SearchSchemaClass(type=reply[0].type)
+        reply = NewSchemaMessage(schema_id=record.id, payload=record.value)
 
-        # reply.assign_thread_from(context.message)
+        reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
