@@ -17,7 +17,7 @@ PROTOCOL_URL = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/acapy-plugin/1.0"
 NEW_SCHEMA = f"{PROTOCOL_URL}/schema"
 SEARCH_SCHEMA = f"{PROTOCOL_URL}/search_schema"
 
-PROTOCOL_PACKAGE = "acapy-plugin"
+PROTOCOL_PACKAGE = "acapy_plugin"
 SCHEMAS = f"{PROTOCOL_PACKAGE}.schemas"
 
 MESSAGE_TYPES = {
