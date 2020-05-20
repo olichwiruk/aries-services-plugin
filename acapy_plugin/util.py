@@ -1,4 +1,14 @@
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
+import sys
+
+
+def generic_init(instance, **kwargs):
+    """Initialize from kwargs into slots."""
+    for slot in instance.__slots__:
+        setattr(instance, slot, kwargs.get(slot))
+        if slot in kwargs:
+            del kwargs[slot]
+    super(type(instance), instance).__init__(**kwargs)
 
 
 def generate_model_schema(

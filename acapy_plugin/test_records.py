@@ -12,12 +12,12 @@ class TestRecordsAdd(TestCase):
     ]"""
 
     def test_init(self):
-        recordsAdd = RecordsAdd(self.payload)
+        recordsAdd = RecordsAdd(payload=self.payload)
         assert recordsAdd.payload == self.payload
         assert recordsAdd.record_id == None
 
     def test_type(self):
-        recordsAdd = RecordsAdd(self.payload)
+        recordsAdd = RecordsAdd(payload=self.payload)
         assert recordsAdd._type == RECORDS_ADD
 
     @mock.patch(f"{RECORDS}.RecordsAddSchema.load")
@@ -31,7 +31,7 @@ class TestRecordsAdd(TestCase):
 
     @mock.patch(f"{RECORDS}.RecordsAddSchema.dump")
     def test_serialize(self, mock_records_add_schema_dump):
-        recordsAdd = RecordsAdd(self.payload)
+        recordsAdd = RecordsAdd(payload=self.payload)
 
         recordsAdd_dict = recordsAdd.serialize()
         mock_records_add_schema_dump.assert_called_once_with(recordsAdd)
@@ -41,7 +41,7 @@ class TestRecordsAdd(TestCase):
 
 class TestRecordsAddSchema(TestCase):
 
-    recordsAdd = RecordsAdd("")
+    recordsAdd = RecordsAdd(payload="a")
 
     def test_make_model(self):
         data = self.recordsAdd.serialize()

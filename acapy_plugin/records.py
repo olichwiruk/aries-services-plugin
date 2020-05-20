@@ -10,6 +10,7 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 
 from marshmallow import fields
+from .util import generate_model_schema
 import uuid
 
 PROTOCOL_URL = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/acapy-plugin/1.0/records"
@@ -29,24 +30,15 @@ RECORDS_ADD_HANDLER = f"{RECORDS}.RecordsAddHandler"
 RECORDS_GET_HANDLER = f"{RECORDS}.RecordsGetHandler"
 
 
-class RecordsAdd(AgentMessage):
-    class Meta:
-        handler_class = RECORDS_ADD_HANDLER
-        message_type = RECORDS_ADD
-        schema_class = "RecordsAddSchema"
-
-    def __init__(self, payload: str, record_id: str = None, **kwargs):
-        super(RecordsAdd, self).__init__(**kwargs)
-        self.payload = payload
-        self.record_id = record_id
-
-
-class RecordsAddSchema(AgentMessageSchema):
-    class Meta:
-        model_class = RecordsAdd
-
-    payload = fields.Str(required=True)
-    record_id = fields.Str(required=False)
+RecordsAdd, RecordsAddSchema = generate_model_schema(
+    name="RecordsAdd",
+    handler=RECORDS_ADD_HANDLER,
+    msg_type=RECORDS_ADD,
+    schema={
+        "payload": fields.Str(required=True),
+        "record_id": fields.Str(required=False),
+    },
+)
 
 
 class RecordsSearch(AgentMessage):
