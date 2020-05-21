@@ -23,7 +23,7 @@ RECORDS = f"{PROTOCOL_PACKAGE}.records"
 
 MESSAGE_TYPES = {
     RECORDS_ADD: f"{RECORDS}.RecordsAdd",
-    RECORDS_GET: f"{RECORDS}.RecordsSearch",
+    RECORDS_GET: f"{RECORDS}.RecordsGet",
 }
 
 RECORDS_ADD_HANDLER = f"{RECORDS}.RecordsAddHandler"
@@ -39,24 +39,6 @@ RecordsAdd, RecordsAddSchema = generate_model_schema(
         "record_id": fields.Str(required=False),
     },
 )
-
-
-class RecordsSearch(AgentMessage):
-    class Meta:
-        handler_class = RECORDS_GET_HANDLER
-        message_type = RECORDS_GET
-        schema_class = "RecordsGetSchema"
-
-    def __init__(self, record_id: str, **kwargs):
-        super(RecordsSearch, self).__init__(**kwargs)
-        self.record_id = record_id
-
-
-class RecordsGetSchema(AgentMessageSchema):
-    class Meta:
-        model_class = RecordsSearch
-
-    record_id = fields.Str(required=True)
 
 
 class RecordsAddHandler(BaseHandler):
@@ -75,12 +57,20 @@ class RecordsAddHandler(BaseHandler):
         await responder.send_reply(reply)
 
 
+RecordsGet, RecordsGetSchema = generate_model_schema(
+    name="RecordsGet",
+    handler=RECORDS_GET_HANDLER,
+    msg_type=RECORDS_GET,
+    schema={"record_id": fields.Str(required=True),},
+)
+
+
 class RecordsGetHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         self._logger.debug("RecordsGetHandler called with context %s", context)
-        assert isinstance(context.message, RecordsSearch)
+        assert isinstance(context.message, RecordsGet)
 
         record = await storage.get_record("OCASchema", context.message.record_id)
 

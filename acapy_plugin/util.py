@@ -31,6 +31,35 @@ def generate_model_schema(
     schema_dict, similar to marshmallow's Schema.from_dict() (can't actually
     use that here as the model_class must be set in the Meta inner-class of
     AgentMessageSchemas).
+
+    Example:
+    
+    RecordsGet, RecordsGetSchema = generate_model_schema(
+        name="RecordsGet",
+        handler=RECORDS_GET_HANDLER,
+        msg_type=RECORDS_GET,
+        schema={"record_id": fields.Str(required=True),},
+    )
+
+    Pretty much equivalent to:
+
+    class RecordsGet(AgentMessage):
+        class Meta:
+            handler_class = RECORDS_GET_HANDLER
+            message_type = RECORDS_GET
+            schema_class = "RecordsGetSchema"
+
+        def __init__(self, record_id: str, **kwargs):
+            super(RecordsGet, self).__init__(**kwargs)
+            self.record_id = record_id
+
+
+    class RecordsGetSchema(AgentMessageSchema):
+        class Meta:
+            model_class = RecordsGet
+
+        record_id = fields.Str(required=True)
+
     """
     if isinstance(schema, dict):
         slots = list(schema.keys())
