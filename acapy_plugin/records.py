@@ -61,7 +61,10 @@ RecordsGet, RecordsGetSchema = generate_model_schema(
     name="RecordsGet",
     handler=RECORDS_GET_HANDLER,
     msg_type=RECORDS_GET,
-    schema={"record_id": fields.Str(required=True),},
+    schema={
+        "record_id": fields.Str(required=True),
+        "payload": fields.Str(required=False),
+    },
 )
 
 
@@ -74,7 +77,7 @@ class RecordsGetHandler(BaseHandler):
 
         record = await storage.get_record("OCASchema", context.message.record_id)
 
-        reply = RecordsAdd(record_id=record.id, payload=record.value)
+        reply = RecordsGet(record_id=record.id, payload=record.value)
 
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)

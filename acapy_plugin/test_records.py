@@ -1,6 +1,11 @@
 from .records import *
 
+from aries_cloudagent.messaging.request_context import RequestContext
+from aries_cloudagent.messaging.responder import MockResponder
+from aries_cloudagent.storage.base import BaseStorage
+from aries_cloudagent.storage.basic import BasicStorage
 from unittest import mock, TestCase
+import pytest
 
 
 class TestRecordsAdd(TestCase):
@@ -51,10 +56,17 @@ class TestRecordsAddSchema(TestCase):
 
 class TestRecordsGet(TestCase):
     record_id = "1234"
+    payload = """[
+        {
+            "data1": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message",
+            "data2": [],
+        }
+    ]"""
 
     def test_init(self):
-        recordsGet = RecordsGet(record_id=self.record_id)
+        recordsGet = RecordsGet(record_id=self.record_id, payload=self.payload)
         assert recordsGet.record_id == self.record_id
+        assert recordsGet.payload == self.payload
 
     def test_type(self):
         recordsGet = RecordsGet(record_id=self.record_id)
@@ -71,7 +83,7 @@ class TestRecordsGet(TestCase):
 
     @mock.patch(f"{RECORDS}.RecordsGetSchema.dump")
     def test_serialize(self, mock_records_get_schema_dump):
-        recordsGet = RecordsGet(record_id=self.record_id)
+        recordsGet = RecordsGet(record_id=self.record_id, payload=self.payload)
 
         recordsGet_dict = recordsGet.serialize()
         mock_records_get_schema_dump.assert_called_once_with(recordsGet)
@@ -80,9 +92,44 @@ class TestRecordsGet(TestCase):
 
 
 class TestRecordsGetSchema(TestCase):
-    recordsGet = RecordsGet(record_id="123566")
+    recordsGet = RecordsGet(record_id="123566", payload="asdafsfsaf")
 
     def test_make_model(self):
         data = self.recordsGet.serialize()
         model_instance = RecordsGet.deserialize(data)
         assert isinstance(model_instance, RecordsGet)
+
+
+class TestRecordsAddHandler:
+    payload = "{'value': 'test'}"
+
+    @pytest.mark.asyncio
+    async def test_records_add(self):
+        context = RequestContext()
+        storage = BasicStorage()
+
+        context.injector.bind_instance(BaseStorage, storage)
+
+        context.message = RecordsAdd(payload=self.payload)
+        handler = RecordsAddHandler()
+        mock_responder = MockResponder()
+        await handler.handle(context, mock_responder)
+        assert mock_responder.messages[0][0].payload == self.payload
+
+
+class TestRecordsGetHandler:
+    @pytest.mark.asyncio
+    async def test_records_get(self):
+        context = RequestContext()
+        storage = BasicStorage()
+        record = StorageRecord(type="OCASchema", value="aaaaa")
+
+        await storage.add_record(record)
+
+        context.injector.bind_instance(BaseStorage, storage)
+        context.message = RecordsGet(record_id=record.id)
+
+        handler = RecordsGetHandler()
+        mock_responder = MockResponder()
+        await handler.handle(context, mock_responder)
+        assert mock_responder.messages[0][0].payload == record.value
