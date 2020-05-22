@@ -11,6 +11,7 @@ from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageS
 
 from marshmallow import fields
 from .util import generate_model_schema
+import hashlib
 import uuid
 
 PROTOCOL_URL = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/acapy-plugin/1.0/records"
@@ -29,6 +30,7 @@ MESSAGE_TYPES = {
 RECORDS_ADD_HANDLER = f"{RECORDS}.RecordsAddHandler"
 RECORDS_GET_HANDLER = f"{RECORDS}.RecordsGetHandler"
 
+RECORD_TYPE = "GenericData"
 
 RecordsAdd, RecordsAddSchema = generate_model_schema(
     name="RecordsAdd",
@@ -36,7 +38,7 @@ RecordsAdd, RecordsAddSchema = generate_model_schema(
     msg_type=RECORDS_ADD,
     schema={
         "payload": fields.Str(required=True),
-        "record_id": fields.Str(required=False),
+        "hashid": fields.Str(required=False),
     },
 )
 
@@ -48,10 +50,13 @@ class RecordsAddHandler(BaseHandler):
         self._logger.debug("RecordsAddHandler called with context %s", context)
         assert isinstance(context.message, RecordsAdd)
 
-        record = StorageRecord(type="OCASchema", value=context.message.payload)
+        payloadUTF8 = context.message.payload.encode("UTF-8")
+        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
+
+        record = StorageRecord(id=record_hash, type=RECORD_TYPE, value=context.message.payload)
         await storage.add_record(record)
 
-        reply = RecordsAdd(payload=record.value, record_id=record.id)
+        reply = RecordsAdd(payload=record.value, hashid=record.id)
 
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
@@ -62,7 +67,7 @@ RecordsGet, RecordsGetSchema = generate_model_schema(
     handler=RECORDS_GET_HANDLER,
     msg_type=RECORDS_GET,
     schema={
-        "record_id": fields.Str(required=True),
+        "hashid": fields.Str(required=True),
         "payload": fields.Str(required=False),
     },
 )
@@ -75,9 +80,9 @@ class RecordsGetHandler(BaseHandler):
         self._logger.debug("RecordsGetHandler called with context %s", context)
         assert isinstance(context.message, RecordsGet)
 
-        record = await storage.get_record("OCASchema", context.message.record_id)
+        record = await storage.get_record(RECORD_TYPE, context.message.hashid)
 
-        reply = RecordsGet(record_id=record.id, payload=record.value)
+        reply = RecordsGet(hashid=record.id, payload=record.value)
 
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)

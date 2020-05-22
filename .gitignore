@@ -5,3 +5,4 @@ env
 .idea/
 .ipynb_checkpoints/
 docs/
+.pytest_cache/1

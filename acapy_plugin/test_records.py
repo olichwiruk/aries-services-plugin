@@ -19,7 +19,7 @@ class TestRecordsAdd(TestCase):
     def test_init(self):
         recordsAdd = RecordsAdd(payload=self.payload)
         assert recordsAdd.payload == self.payload
-        assert recordsAdd.record_id == None
+        assert recordsAdd.hashid == None
 
     def test_type(self):
         recordsAdd = RecordsAdd(payload=self.payload)
@@ -55,7 +55,7 @@ class TestRecordsAddSchema(TestCase):
 
 
 class TestRecordsGet(TestCase):
-    record_id = "1234"
+    hashid = "1234"
     payload = """[
         {
             "data1": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message",
@@ -64,12 +64,12 @@ class TestRecordsGet(TestCase):
     ]"""
 
     def test_init(self):
-        recordsGet = RecordsGet(record_id=self.record_id, payload=self.payload)
-        assert recordsGet.record_id == self.record_id
+        recordsGet = RecordsGet(hashid=self.hashid, payload=self.payload)
+        assert recordsGet.hashid == self.hashid
         assert recordsGet.payload == self.payload
 
     def test_type(self):
-        recordsGet = RecordsGet(record_id=self.record_id)
+        recordsGet = RecordsGet(hashid=self.hashid)
         assert recordsGet._type == RECORDS_GET
 
     @mock.patch(f"{RECORDS}.RecordsGetSchema.load")
@@ -83,7 +83,7 @@ class TestRecordsGet(TestCase):
 
     @mock.patch(f"{RECORDS}.RecordsGetSchema.dump")
     def test_serialize(self, mock_records_get_schema_dump):
-        recordsGet = RecordsGet(record_id=self.record_id, payload=self.payload)
+        recordsGet = RecordsGet(hashid=self.hashid, payload=self.payload)
 
         recordsGet_dict = recordsGet.serialize()
         mock_records_get_schema_dump.assert_called_once_with(recordsGet)
@@ -92,7 +92,7 @@ class TestRecordsGet(TestCase):
 
 
 class TestRecordsGetSchema(TestCase):
-    recordsGet = RecordsGet(record_id="123566", payload="asdafsfsaf")
+    recordsGet = RecordsGet(hashid="123566", payload="asdafsfsaf")
 
     def test_make_model(self):
         data = self.recordsGet.serialize()
@@ -113,8 +113,13 @@ class TestRecordsAddHandler:
         context.message = RecordsAdd(payload=self.payload)
         handler = RecordsAddHandler()
         mock_responder = MockResponder()
+
         await handler.handle(context, mock_responder)
         assert mock_responder.messages[0][0].payload == self.payload
+
+        payloadUTF8 = self.payload.encode("UTF-8")
+        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
+        assert mock_responder.messages[0][0].hashid == record_hash
 
 
 class TestRecordsGetHandler:
@@ -122,14 +127,23 @@ class TestRecordsGetHandler:
     async def test_records_get(self):
         context = RequestContext()
         storage = BasicStorage()
-        record = StorageRecord(type="OCASchema", value="aaaaa")
+
+        payload = "aaaaa"
+        payloadUTF8 = payload.encode("UTF-8")
+        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
+
+        record = StorageRecord(id=record_hash, type=RECORD_TYPE, value="aaaaa")
 
         await storage.add_record(record)
 
         context.injector.bind_instance(BaseStorage, storage)
-        context.message = RecordsGet(record_id=record.id)
+        context.message = RecordsGet(hashid=record.id)
 
         handler = RecordsGetHandler()
         mock_responder = MockResponder()
         await handler.handle(context, mock_responder)
         assert mock_responder.messages[0][0].payload == record.value
+
+        payloadUTF8 = mock_responder.messages[0][0].payload.encode("UTF-8")
+        message_hash = hashlib.sha256(payloadUTF8).hexdigest()
+        assert message_hash == record.id
