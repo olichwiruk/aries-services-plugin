@@ -7,6 +7,12 @@ import uuid
 import regex
 
 
+PROTOCOLS = {}
+PROTOCOLS['connection_get_list'] = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/connection-get-list"
+PROTOCOLS['receive_invitation'] = 'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/receive-invitation'
+PROTOCOLS['create_invitation'] = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-invitations/0.1/create'
+
+
 def connectWithAcapy(agent, controller):
     uniqueId = str(uuid.uuid4())
     # our request body
@@ -126,3 +132,13 @@ def buildMessage(protocol: str, **parameters) -> dict:
     for name, value in parameters.items():
         message[name] = value
     return message
+
+
+# pack a message, send message, unpack and return response as dict
+def sendMessage(message: dict, connection: dict) -> dict:
+    encodedMessage = packMessage(message, connection)
+    endpoint = connection['DIDDoc']['service'][0]['serviceEndpoint']
+    response = requests.post(endpoint, data=encodedMessage)
+    responseDecoded = unpackMessage(response.text, connection['myKey'])
+    responseDecoded = json.loads(responseDecoded[0])
+    return responseDecoded
