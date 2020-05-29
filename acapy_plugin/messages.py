@@ -1,5 +1,6 @@
 from .message_types import *
 from .util import generate_model_schema
+from marshmallow import fields
 
 HANDLERS = f"{PROTOCOL_PACKAGE}.handlers"
 ADD_HANDLER = f"{HANDLERS}.RecordsAddHandler"

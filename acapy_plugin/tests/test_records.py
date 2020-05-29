@@ -1,6 +1,5 @@
-from ..handlers import *
-from ..messages import *
-from ..message_types import *
+from .handlers import *
+from .messages import *
 
 from aries_cloudagent.messaging.request_context import RequestContext
 from aries_cloudagent.messaging.responder import MockResponder

@@ -13,6 +13,7 @@ from marshmallow import fields
 import hashlib
 import uuid
 from .message_types import *
+from .messages import *
 from .util import *
 
 

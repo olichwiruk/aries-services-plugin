@@ -10,7 +10,8 @@ from aries_cloudagent.messaging.base_handler import (
     BaseResponder,
     RequestContext,
 )
-from aries_cloudagent.protocols.problem_report.message import ProblemReport
+
+# from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 
 def generic_init(instance, **kwargs):
@@ -139,36 +140,36 @@ def datetime_from_iso(timestamp: str) -> datetime:
     return isoparse(timestamp)
 
 
-def require_role(role):
-    """
-    Verify that the current connection has a given role.
+# def require_role(role):
+#     """
+#     Verify that the current connection has a given role.
 
-    Verify that the current connection has a given role; otherwise, send a
-    problem report.
-    """
+#     Verify that the current connection has a given role; otherwise, send a
+#     problem report.
+#     """
 
-    def _require_role(func):
-        @functools.wraps(func)
-        async def _wrapped(handler, context: RequestContext, responder: BaseResponder):
+#     def _require_role(func):
+#         @functools.wraps(func)
+#         async def _wrapped(handler, context: RequestContext, responder: BaseResponder):
 
-            if (
-                not context.connection_record
-                or context.connection_record.their_role != role
-            ):
-                report = ProblemReport(
-                    explain_ltxt="This connection is not authorized to perform"
-                    " the requested action.",
-                    who_retries="none",
-                )
-                report.assign_thread_from(context.message)
-                await responder.send_reply(report)
-                return
+#             if (
+#                 not context.connection_record
+#                 or context.connection_record.their_role != role
+#             ):
+#                 report = ProblemReport(
+#                     explain_ltxt="This connection is not authorized to perform"
+#                     " the requested action.",
+#                     who_retries="none",
+#                 )
+#                 report.assign_thread_from(context.message)
+#                 await responder.send_reply(report)
+#                 return
 
-            return await func(handler, context, responder)
+#             return await func(handler, context, responder)
 
-        return _wrapped
+#         return _wrapped
 
-    return _require_role
+#     return _require_role
 
 
 def admin_only(func):
