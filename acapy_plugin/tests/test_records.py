@@ -1,4 +1,6 @@
-from .records import *
+from ..handlers import *
+from ..messages import *
+from ..message_types import *
 
 from aries_cloudagent.messaging.request_context import RequestContext
 from aries_cloudagent.messaging.responder import MockResponder
@@ -147,3 +149,32 @@ class TestRecordsGetHandler:
         payloadUTF8 = mock_responder.messages[0][0].payload.encode("UTF-8")
         message_hash = hashlib.sha256(payloadUTF8).hexdigest()
         assert message_hash == record.id
+
+
+class TestRecordsListHandler:
+    @pytest.mark.asyncio
+    async def test_records_get(self):
+        context = RequestContext()
+        storage = BasicStorage()
+
+        payload = "aaaaa"
+        payloadUTF8 = payload.encode("UTF-8")
+        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
+
+        record = StorageRecord(id=record_hash, type=RECORD_TYPE, value=payload)
+        await storage.add_record(record)
+
+        payload = "bbbbb"
+        payloadUTF8 = payload.encode("UTF-8")
+        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
+
+        record = StorageRecord(id=record_hash, type=RECORD_TYPE, value=payload)
+        await storage.add_record(record)
+
+        context.injector.bind_instance(BaseStorage, storage)
+        context.message = RecordsList()
+
+        handler = RecordsListHandler()
+        mock_responder = MockResponder()
+        await handler.handle(context, mock_responder)
+        assert mock_responder.messages[0][0][1].payload == record.value
