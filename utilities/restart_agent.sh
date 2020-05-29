@@ -1,1 +1,1 @@
-sudo docker restart aries_agent1.localhost_1
+sudo docker restart aries_agent$1.localhost_1

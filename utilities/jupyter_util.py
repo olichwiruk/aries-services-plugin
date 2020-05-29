@@ -7,11 +7,14 @@ import uuid
 import regex
 
 
-PROTOCOLS = {}
-PROTOCOLS['connection_get_list'] = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/connection-get-list"
-PROTOCOLS['receive_invitation'] = 'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/receive-invitation'
-PROTOCOLS['create_invitation'] = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-invitations/0.1/create'
-
+PROTOCOLS_CONNECTION_GET_LIST = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/connection-get-list"
+PROTOCOLS_NEW_CONNECTION_GET_LIST = "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/get-list"
+PROTOCOLS_NEW_CONNECTION_RECEIVE_INVITATION = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/receive-invitation'
+PROTOCOLS_RECEIVE_INVITATION = 'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/receive-invitation'
+PROTOCOLS_CREATE_INVITATION = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-invitations/0.1/create'
+PROTOCOLS_DIDS_LIST = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-list-dids"
+PROTOCOLS_DIDS_GET_PUBLIC = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-public-did"
+PROTOCOLS_DIDS_SET_PUBLIC = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/set-public-did"
 
 def connectWithAcapy(agent, controller):
     uniqueId = str(uuid.uuid4())
