@@ -157,3 +157,36 @@ def connectAgents(connectionAgent1, connectionAgent2):
     receiveInvitation = sendMessage(message, connectionAgent2)
     
     return receiveInvitation
+
+## after agents connect
+
+def getDidsList(connection):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-list-dids"
+    )
+    dids = sendMessage(message, connection)
+    return dids
+
+
+def getConnectionList(connection):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/get-list"
+    )
+    return sendMessage(message, connections[0])
+
+## connection, admin connection to agent, connection_id -> id of the agent to agent connection
+def sendBasicMessage(connection, agent_to_agent_connection_id, content):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/send",
+        connection_id=agent_to_agent_connection_id,
+        content=content
+    )
+    response = sendMessage(message, connection)
+    return response
+
+def getBasicMessages(connection):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/get"
+    )
+    public_did = sendMessage(message, connection)
+    return public_did
