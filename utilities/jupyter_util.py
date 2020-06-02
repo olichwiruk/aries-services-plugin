@@ -6,16 +6,6 @@ import json
 import uuid
 import regex
 
-
-PROTOCOLS_CONNECTION_GET_LIST = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/connection-get-list"
-PROTOCOLS_NEW_CONNECTION_GET_LIST = "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/get-list"
-PROTOCOLS_NEW_CONNECTION_RECEIVE_INVITATION = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/receive-invitation'
-PROTOCOLS_RECEIVE_INVITATION = 'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/receive-invitation'
-PROTOCOLS_CREATE_INVITATION = 'https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-invitations/0.1/create'
-PROTOCOLS_DIDS_LIST = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-list-dids"
-PROTOCOLS_DIDS_GET_PUBLIC = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-public-did"
-PROTOCOLS_DIDS_SET_PUBLIC = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/set-public-did"
-
 def connectWithAcapy(agent, controller):
     uniqueId = str(uuid.uuid4())
     # our request body
@@ -145,3 +135,25 @@ def sendMessage(message: dict, connection: dict) -> dict:
     responseDecoded = unpackMessage(response.text, connection['myKey'])
     responseDecoded = json.loads(responseDecoded[0])
     return responseDecoded
+
+
+# connects agent1 to agent2 where agent2 receives invitation
+# returns agent2 response from receiveing invitation
+def connectAgents(connectionAgent1, connectionAgent2):
+    ## create invitation
+    message = buildMessage(
+        'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/create-invitation',
+        label="ConnectionBetweenAgents",
+        auto_accept='auto',
+        alias="agent1ToAgent2"
+    )
+    createInvitation = sendMessage(message, connectionAgent1)
+    
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/receive-invitation",
+        auto_accept=True,
+        invitation=createInvitation['invitation_url'],
+    )
+    receiveInvitation = sendMessage(message, connectionAgent2)
+    
+    return receiveInvitation
