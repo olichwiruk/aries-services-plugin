@@ -233,3 +233,31 @@ def deleteBasicMessage(agent, connection_id, message_id):
         message_id=message_id
     )
     return sendMessage(message, agent)
+
+# this works but is not handled well on toolbox side
+def registerDidOnLedger(agent,verkey,alias=None,role=None):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/register-did",
+        did=did,
+        verkey=verkey
+    )
+    return sendMessage(message, agent)
+
+def getPublicDid(agent):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-public-did"
+    )
+    return sendMessage(message, agent)
+
+def setPublicDid(agent, did):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/set-public-did",
+        did=did
+    )
+    return sendMessage(message, agent)
+
+def createDid(agent):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/create-did"
+    )
+    return sendMessage(message, agent)
