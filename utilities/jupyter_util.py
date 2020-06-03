@@ -136,6 +136,33 @@ def sendMessage(message: dict, connection: dict) -> dict:
     responseDecoded = json.loads(responseDecoded[0])
     return responseDecoded
 
+# needs testing
+def createInvitation(agent, label, alias):
+    message = buildMessage(
+        'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/create-invitation',
+        label=label,
+        auto_accept='auto',
+        alias=alias
+    )
+    return sendMessage(message, agent)
+
+# needs testing
+def receiveInvitation(agent, invitation):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/receive-invitation",
+        auto_accept=True,
+        invitation=createInvitation['invitation_url'],
+    )
+    return endMessage(message, agent)
+
+# needs testing
+def receiveInvitationURL(agent, invitationURL):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/receive-invitation",
+        auto_accept=True,
+        invitation=createInvitation,
+    )
+    return endMessage(message, agent)
 
 # connects agent1 to agent2 where agent2 receives invitation
 # returns agent2 response from receiveing invitation
@@ -160,49 +187,49 @@ def connectAgents(connectionAgent1, connectionAgent2):
 
 ## after agents connect
 
-def getDidsList(connection):
+def getDidsList(agent):
     message = buildMessage(
         "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/get-list-dids"
     )
-    dids = sendMessage(message, connection)
+    dids = sendMessage(message, agent)
     return dids
 
 
-def getConnectionList(connection):
+def getConnections(agent):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/get-list"
     )
-    return sendMessage(message, connection)
+    return sendMessage(message, agent)
 
 ## connection, admin connection to agent, connection_id -> id of the agent to agent connection
-def sendBasicMessage(connection, agent_to_agent_connection_id, content):
+def sendBasicMessage(agent, agent_to_agent_connection_id, content):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/send",
         connection_id=agent_to_agent_connection_id,
         content=content
     )
-    response = sendMessage(message, connection)
+    response = sendMessage(message, agent)
     return response
 
-def getBasicMessage(connection):
+def getBasicMessage(agent):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/get"
     )
-    public_did = sendMessage(message, connection)
+    public_did = sendMessage(message, agent)
     return public_did
 
 
-def getFeatureDiscovery(connection):
+def getFeatureDiscovery(agent):
     message = buildMessage(
         "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/discover-features/1.0/query",
         query="*"
     )
-    return sendMessage(message, connection)
+    return sendMessage(message, agent)
 
-def deleteBasicMessage(connection, connection_id, message_id):
+def deleteBasicMessage(agent, connection_id, message_id):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/delete",
         connection_id=connection_id,
         message_id=message_id
     )
-    return sendMessage(message, connection)
+    return sendMessage(message, agent)
