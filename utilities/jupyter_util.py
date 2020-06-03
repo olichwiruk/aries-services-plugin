@@ -172,7 +172,7 @@ def getConnectionList(connection):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-connections/0.1/get-list"
     )
-    return sendMessage(message, connections[0])
+    return sendMessage(message, connection)
 
 ## connection, admin connection to agent, connection_id -> id of the agent to agent connection
 def sendBasicMessage(connection, agent_to_agent_connection_id, content):
@@ -184,9 +184,25 @@ def sendBasicMessage(connection, agent_to_agent_connection_id, content):
     response = sendMessage(message, connection)
     return response
 
-def getBasicMessages(connection):
+def getBasicMessage(connection):
     message = buildMessage(
         "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/get"
     )
     public_did = sendMessage(message, connection)
     return public_did
+
+
+def getFeatureDiscovery(connection):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/discover-features/1.0/query",
+        query="*"
+    )
+    return sendMessage(message, connection)
+
+def deleteBasicMessage(connection, connection_id, message_id):
+    message = buildMessage(
+        "https://github.com/hyperledger/aries-toolbox/tree/master/docs/admin-basicmessage/0.1/delete",
+        connection_id=connection_id,
+        message_id=message_id
+    )
+    return sendMessage(message, connection)
