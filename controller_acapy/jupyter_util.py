@@ -235,7 +235,7 @@ def deleteBasicMessage(agent, connection_id, message_id):
     return sendMessage(message, agent)
 
 # this works but is not handled well on toolbox side
-def registerDidOnLedger(agent,verkey,alias=None,role=None):
+def registerDidOnLedger(agent,did,verkey,alias=None,role=None):
     message = buildMessage(
         "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/register-did",
         did=did,
@@ -259,5 +259,35 @@ def setPublicDid(agent, did):
 def createDid(agent):
     message = buildMessage(
         "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-dids/0.1/create-did"
+    )
+    return sendMessage(message, agent)
+
+def schemaGetList(agent):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-schemas/0.1/schema-get-list"
+    )
+    return sendMessage(message, agent)
+
+# send schema in toolbox needs better error handling when sending duplicate name
+def sendSchema(agent, schema_name, schema_version, attributes):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-schemas/0.1/send-schema",
+        schema_name=schema_name,
+        schema_version=schema_version,
+        attributes=attributes
+    )
+    return sendMessage(message, agent)
+
+def schemaGet(agent, schema_id):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-schemas/0.1/schema-get",
+        schema_id=schema_id
+    )
+    return sendMessage(message, agent)
+
+def sendCredentialDefinition(agent, schema_id):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-credential-definitions/0.1/send-credential-definition",
+        schema_id=schema_id
     )
     return sendMessage(message, agent)
