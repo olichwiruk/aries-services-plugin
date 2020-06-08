@@ -137,7 +137,7 @@ def sendMessage(message: dict, connection: dict) -> dict:
     return responseDecoded
 
 # needs testing
-def createInvitation(agent, label, alias):
+def createInvitation(agent, label = None, alias = None):
     message = buildMessage(
         'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/create-invitation',
         label=label,
@@ -289,5 +289,19 @@ def sendCredentialDefinition(agent, schema_id):
     message = buildMessage(
         "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-credential-definitions/0.1/send-credential-definition",
         schema_id=schema_id
+    )
+    return sendMessage(message, agent)
+
+# cred def needs error handling
+def getCredentialDefinition(agent, cred_def_id):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-credential-definitions/0.1/credential-definition-get",
+        cred_def_id=cred_def_id
+    )
+    return sendMessage(message, agent)
+
+def getCredentialDefinitionList(agent):
+    message = buildMessage(
+        "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-credential-definitions/0.1/credential-definition-get-list"
     )
     return sendMessage(message, agent)
