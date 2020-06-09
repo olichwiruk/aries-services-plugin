@@ -1,10 +1,8 @@
-PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/acapy-plugin/1.0"
-ADD = f"{PROTOCOL_URI}/add"
-GET = f"{PROTOCOL_URI}/get"
+from .schema_exchange import MESSAGE_TYPES as SCHEMA_EXCHANGE_MESSAGE_TYPES
+
+MESSAGE_TYPES = {}
+MESSAGE_TYPES.update(SCHEMA_EXCHANGE_MESSAGE_TYPES)
+print("\n\n\n\n\n\n\n\n\n\n\n")
+print(MESSAGE_TYPES)
 
 
-PROTOCOL_PACKAGE = "acapy_plugin"
-MESSAGE_TYPES = {
-    ADD: f"{PROTOCOL_PACKAGE}.messages.RecordsAdd",
-    GET: f"{PROTOCOL_PACKAGE}.messages.RecordsGet",
-}
