@@ -5,6 +5,7 @@ from aries_cloudagent.messaging.base_handler import (
     RequestContext,
 )
 from aries_cloudagent.storage.record import StorageRecord
+from aries_cloudagent.storage.error import StorageDuplicateError
 from aries_cloudagent.core.plugin_registry import PluginRegistry
 from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
@@ -60,30 +61,23 @@ class SendHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        self._logger.debug("SendHandler called with context %s", context)
+        self._logger.debug("SCHEMA_EXCHANGE SendHandler called with context %s", context)
         assert isinstance(context.message, Send)
-
-        try:
-            connection = await ConnectionRecord.retrieve_by_id(
-                context, context.message.connection_id
-            )
-        except StorageNotFoundError:
-            report = ProblemReport(
-                explain_ltxt="Connection not found.", who_retries="none"
-            )
-            report.assign_thread_from(context.message)
-            await responder.send_reply(report)
-            return
 
         payloadUTF8 = context.message.payload.encode("UTF-8")
         record_hash = hashlib.sha256(payloadUTF8).hexdigest()
 
-
         record = StorageRecord(
-            id=record_hash, type=RECORD_TYPE, value=context.message.payload
-        )
-        await storage.add_record(record)
-            
+            id=record_hash, type=RECORD_TYPE, value=context.message.payload)
+
+        # add record to storage
+        try:
+            await storage.add_record(record)
+        except StorageDuplicateError:
+            report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
+            return
 
         reply = Send(payload=record.value, hashid=record.id)
         reply.assign_thread_from(context.message)
@@ -94,7 +88,7 @@ class GetHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        self._logger.debug("GetHandler called with context %s", context)
+        self._logger.debug("SCHEMA_EXCHANGE GetHandler called with context %s", context)
         assert isinstance(context.message, Get)
 
         record = await storage.get_record(RECORD_TYPE, context.message.hashid)
@@ -103,4 +97,3 @@ class GetHandler(BaseHandler):
 
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
-
