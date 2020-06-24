@@ -89,12 +89,8 @@ class SchemaExchangeHandler(BaseHandler):
         )
         assert isinstance(context.message, SchemaExchange)
 
-        # Hash the payload
-        payloadUTF8 = context.message.payload.encode("UTF-8")
-        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
-
         record = SchemaExchangeRecord(
-            id=record_hash, author="other", payload=context.message.payload
+            author="other", payload=context.message.payload
         )
 
         # Add record to storage
@@ -127,17 +123,13 @@ class SendHandler(BaseHandler):
             await responder.send_reply(report)
             return
 
-        # Hash the payload
-        payloadUTF8 = context.message.payload.encode("UTF-8")
-        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
 
         # Send based on connection id
-        message = SchemaExchange(payload=payloadUTF8)
+        message = SchemaExchange(payload=context.message.payload)
         await responder.send(message, connection_id=connection.connection_id)
 
         # Create record to store localy
         record = SchemaExchangeRecord(
-            id=record_hash, 
             payload=context.message.payload,
             author="self"
         )
@@ -154,28 +146,31 @@ class SendHandler(BaseHandler):
             return
 
         # Pack and reply
-        reply = Send(payload=record.value, hashid=record.id)
+        reply = Send(payload=record.payload, hashid=record.hashid)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 
 
 class GetHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
-
         self._logger.debug("SCHEMA_EXCHANGE GetHandler called with context %s", context)
         assert isinstance(context.message, Get)
 
+
         ## Search for record
         try:
-            record = await storage.get_record("SchemaExchange", context.message.hashid)
+            records = await SchemaExchangeRecord.query(
+                context, post_filter_positive={"hashid": context.message.hashid}
+            )
+            self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", records)
         except StorageNotFoundError:
             report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
             report.assign_thread_from(context.message)
             await responder.send_reply(report)
             return
 
+        record = records.pop()
         # Pack and reply
-        reply = Get(hashid=record.id, payload=record.value)
+        reply = Get(hashid=record.hashid, payload=record.value)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
