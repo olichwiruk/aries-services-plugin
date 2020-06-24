@@ -7,8 +7,9 @@ from aries_cloudagent.messaging.base_handler import (
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.core.plugin_registry import PluginRegistry
 from aries_cloudagent.config.injection_context import InjectionContext
+from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
 
-
+# Records, messages and schemas
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.storage.record import StorageRecord
@@ -23,6 +24,7 @@ import hashlib
 import uuid
 
 # Internal
+from .records import SchemaExchangeRecord
 from .util import *
 
 
@@ -39,8 +41,6 @@ MESSAGE_TYPES = {
     GET: f"{PROTOCOL_PACKAGE}.Get",
     SCHEMA_EXCHANGE: f"{PROTOCOL_PACKAGE}.SchemaExchange",
 }
-
-RECORD_TYPE = "GenericData"
 
 ## Important agent messages
 
@@ -84,8 +84,6 @@ Get, GetSchema = generate_model_schema(
 # something to someone and I dont want class for sending and receiveing so schema exchange for now
 class SchemaExchangeHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
-
         self._logger.debug(
             "SCHEMA_EXCHANGE SchemaExchange called with context %s", context
         )
@@ -95,13 +93,13 @@ class SchemaExchangeHandler(BaseHandler):
         payloadUTF8 = context.message.payload.encode("UTF-8")
         record_hash = hashlib.sha256(payloadUTF8).hexdigest()
 
-        record = StorageRecord(
-            id=record_hash, type=RECORD_TYPE, value=context.message.payload
+        record = SchemaExchangeRecord(
+            id=record_hash, author="other", payload=context.message.payload
         )
 
         # Add record to storage
         try:
-            await storage.add_record(record)
+            await record.save(context, reason="Saved, SchemaExchange from Other agent")
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
             report.assign_thread_from(context.message)
@@ -111,8 +109,6 @@ class SchemaExchangeHandler(BaseHandler):
 
 class SendHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
-
         self._logger.debug(
             "SCHEMA_EXCHANGE SendHandler called with context %s", context
         )
@@ -140,13 +136,17 @@ class SendHandler(BaseHandler):
         await responder.send(message, connection_id=connection.connection_id)
 
         # Create record to store localy
-        record = StorageRecord(
-            id=record_hash, type=RECORD_TYPE, value=context.message.payload
+        record = SchemaExchangeRecord(
+            id=record_hash, 
+            payload=context.message.payload,
+            author="self"
         )
 
         # Add record to storage
         try:
-            await storage.add_record(record)
+            await record.save(
+                context, reason="Send a SchemaExchange proposal"
+            )
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
             report.assign_thread_from(context.message)
@@ -168,7 +168,7 @@ class GetHandler(BaseHandler):
 
         ## Search for record
         try:
-            record = await storage.get_record(RECORD_TYPE, context.message.hashid)
+            record = await storage.get_record("SchemaExchange", context.message.hashid)
         except StorageNotFoundError:
             report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
             report.assign_thread_from(context.message)
