@@ -156,12 +156,9 @@ class GetHandler(BaseHandler):
         self._logger.debug("SCHEMA_EXCHANGE GetHandler called with context %s", context)
         assert isinstance(context.message, Get)
 
-
         ## Search for record
         try:
-            records = await SchemaExchangeRecord.query(
-                context, post_filter_positive={"hashid": context.message.hashid}
-            )
+            record = await SchemaExchangeRecord.retrieve_by_hashid(context, context.message.hashid)
             self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", records)
         except StorageNotFoundError:
             report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
@@ -169,7 +166,7 @@ class GetHandler(BaseHandler):
             await responder.send_reply(report)
             return
 
-        record = records.pop()
+        record = record[0]
         # Pack and reply
         reply = Get(hashid=record.hashid, payload=record.value)
         reply.assign_thread_from(context.message)

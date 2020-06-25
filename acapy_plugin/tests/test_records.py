@@ -1,180 +1,75 @@
-from ..message_types import *
-from ..messages import *
-from ..handlers import *
-
-from aries_cloudagent.messaging.request_context import RequestContext
-from aries_cloudagent.messaging.responder import MockResponder
-from aries_cloudagent.storage.base import BaseStorage
+from aries_cloudagent.config.injection_context import InjectionContext
+from ..records import SchemaExchangeRecord, SchemaExchangeRecordSchema
+from aries_cloudagent.messaging.responder import BaseResponder, MockResponder
+from aries_cloudagent.storage.base import BaseStorage, StorageRecord
 from aries_cloudagent.storage.basic import BasicStorage
+from asynctest import TestCase as AsyncTestCase, mock as async_mock
+
+import hashlib
+from marshmallow import fields
 from unittest import mock, TestCase
-import pytest
+import json
 
 
-class TestRecordsAdd(TestCase):
-    payload = """[
-        {
-            "data1": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message",
-            "data2": [],
-        }
-    ]"""
+class TestSchemaExchangeRecord(AsyncTestCase):
+    payload = "{Test Payload}"
+    hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
+    author = "self"
 
-    def test_init(self):
-        recordsAdd = RecordsAdd(payload=self.payload)
-        assert recordsAdd.payload == self.payload
-        assert recordsAdd.hashid == None
+    def testInit(self):
+        record = SchemaExchangeRecord(payload=self.payload, author=self.author)
+        assert self.hashid == record.hashid
 
-    def test_type(self):
-        recordsAdd = RecordsAdd(payload=self.payload)
-        assert recordsAdd._type == ADD
+        record = SchemaExchangeRecord(
+            payload=self.payload, author=self.author, hashid=self.hashid)
+        assert self.hashid == record.hashid
 
-    @mock.patch(f"{PROTOCOL_PACKAGE}.messages.RecordsAddSchema.load")
-    def test_deserialize(self, mock_records_add_schema_load):
-        obj = {"obj": "obj"}
-
-        recordsAdd = RecordsAdd.deserialize(obj)
-        mock_records_add_schema_load.assert_called_once_with(obj)
-
-        assert recordsAdd is mock_records_add_schema_load.return_value
-
-    @mock.patch(f"{PROTOCOL_PACKAGE}.messages.RecordsAddSchema.dump")
-    def test_serialize(self, mock_records_add_schema_dump):
-        recordsAdd = RecordsAdd(payload=self.payload)
-
-        recordsAdd_dict = recordsAdd.serialize()
-        mock_records_add_schema_dump.assert_called_once_with(recordsAdd)
-
-        assert recordsAdd_dict is mock_records_add_schema_dump.return_value
-
-
-class TestRecordsAddSchema(TestCase):
-
-    recordsAdd = RecordsAdd(payload="a")
-
-    def test_make_model(self):
-        data = self.recordsAdd.serialize()
-        model_instance = RecordsAdd.deserialize(data)
-        assert isinstance(model_instance, RecordsAdd)
-
-
-class TestRecordsGet(TestCase):
-    hashid = "1234"
-    payload = """[
-        {
-            "data1": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/basicmessage/1.0/message",
-            "data2": [],
-        }
-    ]"""
-
-    def test_init(self):
-        recordsGet = RecordsGet(hashid=self.hashid, payload=self.payload)
-        assert recordsGet.hashid == self.hashid
-        assert recordsGet.payload == self.payload
-
-    def test_type(self):
-        recordsGet = RecordsGet(hashid=self.hashid)
-        assert recordsGet._type == GET
-
-    @mock.patch(f"{PROTOCOL_PACKAGE}.messages.RecordsGetSchema.load")
-    def test_deserialize(self, mock_records_get_schema_load):
-        obj = {"obj": "obj"}
-
-        recordsGet = RecordsGet.deserialize(obj)
-        mock_records_get_schema_load.assert_called_once_with(obj)
-
-        assert recordsGet is mock_records_get_schema_load.return_value
-
-    @mock.patch(f"{PROTOCOL_PACKAGE}.messages.RecordsGetSchema.dump")
-    def test_serialize(self, mock_records_get_schema_dump):
-        recordsGet = RecordsGet(hashid=self.hashid, payload=self.payload)
-
-        recordsGet_dict = recordsGet.serialize()
-        mock_records_get_schema_dump.assert_called_once_with(recordsGet)
-
-        assert recordsGet_dict is mock_records_get_schema_dump.return_value
-
-
-class TestRecordsGetSchema(TestCase):
-    recordsGet = RecordsGet(hashid="123566", payload="asdafsfsaf")
-
-    def test_make_model(self):
-        data = self.recordsGet.serialize()
-        model_instance = RecordsGet.deserialize(data)
-        assert isinstance(model_instance, RecordsGet)
-
-
-class TestRecordsAddHandler:
-    payload = "{'value': 'test'}"
-
-    @pytest.mark.asyncio
-    async def test_records_add(self):
-        context = RequestContext()
+    async def testSaveAndRetrieve(self):
+        context = InjectionContext()
         storage = BasicStorage()
-
         context.injector.bind_instance(BaseStorage, storage)
+        record = SchemaExchangeRecord(payload=self.payload, author=self.author)
+        record_id = await record.save(context)
+        query = await SchemaExchangeRecord.retrieve_by_hashid(context, record.hashid)
+        assert query == record
 
-        context.message = RecordsAdd(payload=self.payload)
-        handler = RecordsAddHandler()
-        mock_responder = MockResponder()
+        # query = await SchemaExchangeRecord.query(context, post_filter_positive={"hashid": record.hashid})
+        # assert query == self.payload
 
-        await handler.handle(context, mock_responder)
-        assert mock_responder.messages[0][0].payload == self.payload
+    # async def test_query(self):
+    #     context = InjectionContext(enforce_typing=False)
+    #     mock_storage = async_mock.MagicMock(BaseStorage, autospec=True)
+    #     context.injector.bind_instance(BaseStorage, mock_storage)
+    #     record_id = "record_id"
+    #     record_value = {"created_at": time_now(), "updated_at": time_now()}
+    #     tag_filter = {"tag": "filter"}
+    #     stored = StorageRecord(
+    #         BaseRecordImpl.RECORD_TYPE, json.dumps(record_value), {}, record_id
+    #     )
 
-        payloadUTF8 = self.payload.encode("UTF-8")
-        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
-        assert mock_responder.messages[0][0].hashid == record_hash
+    #     mock_storage.search_records.return_value.__aiter__.return_value = [stored]
+    #     result = await BaseRecordImpl.query(context, tag_filter)
+    #     mock_storage.search_records.assert_called_once_with(
+    #         BaseRecordImpl.RECORD_TYPE, tag_filter, None, {"retrieveTags": False}
+    #     )
+    #     assert result and isinstance(result[0], BaseRecordImpl)
+    #     assert result[0]._id == record_id
+    #     assert result[0].value == record_value
 
-
-class TestRecordsGetHandler:
-    @pytest.mark.asyncio
-    async def test_records_get(self):
-        context = RequestContext()
-        storage = BasicStorage()
-
-        payload = "aaaaa"
-        payloadUTF8 = payload.encode("UTF-8")
-        record_hash = hashlib.sha256(payloadUTF8).hexdigest()
-
-        record = StorageRecord(id=record_hash, type=RECORD_TYPE, value="aaaaa")
-
-        await storage.add_record(record)
-
-        context.injector.bind_instance(BaseStorage, storage)
-        context.message = RecordsGet(hashid=record.id)
-
-        handler = RecordsGetHandler()
-        mock_responder = MockResponder()
-        await handler.handle(context, mock_responder)
-        assert mock_responder.messages[0][0].payload == record.value
-
-        payloadUTF8 = mock_responder.messages[0][0].payload.encode("UTF-8")
-        message_hash = hashlib.sha256(payloadUTF8).hexdigest()
-        assert message_hash == record.id
-
-
-# class TestRecordsListHandler:
-#     @pytest.mark.asyncio
-#     async def test_records_get(self):
-#         context = RequestContext()
-#         storage = BasicStorage()
-
-#         payload = "aaaaa"
-#         payloadUTF8 = payload.encode("UTF-8")
-#         record_hash = hashlib.sha256(payloadUTF8).hexdigest()
-
-#         record = StorageRecord(id=record_hash, type=RECORD_TYPE, value=payload)
-#         await storage.add_record(record)
-
-#         payload = "bbbbb"
-#         payloadUTF8 = payload.encode("UTF-8")
-#         record_hash = hashlib.sha256(payloadUTF8).hexdigest()
-
-#         record = StorageRecord(id=record_hash, type=RECORD_TYPE, value=payload)
-#         await storage.add_record(record)
-
-#         context.injector.bind_instance(BaseStorage, storage)
-#         context.message = RecordsList()
-
-#         handler = RecordsListHandler()
-#         mock_responder = MockResponder()
-#         await handler.handle(context, mock_responder)
-#         assert mock_responder.messages[0][0][1].payload == record.value
+    # async def test_post_save_exist(self):
+    #     context = InjectionContext(enforce_typing=False)
+    #     mock_storage = async_mock.MagicMock()
+    #     mock_storage.update_record_value = async_mock.CoroutineMock()
+    #     mock_storage.update_record_tags = async_mock.CoroutineMock()
+    #     context.injector.bind_instance(BaseStorage, mock_storage)
+    #     record = BaseRecordImpl()
+    #     last_state = "last_state"
+    #     record._last_state = last_state
+    #     record._id = "id"
+    #     with async_mock.patch.object(
+    #         record, "post_save", async_mock.CoroutineMock()
+    #     ) as post_save:
+    #         await record.save(context, reason="reason", webhook=False)
+    #         post_save.assert_called_once_with(context, False, last_state, False)
+    #     mock_storage.update_record_value.assert_called_once()
+    #     mock_storage.update_record_tags.assert_called_once()
