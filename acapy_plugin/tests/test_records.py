@@ -21,17 +21,26 @@ class TestSchemaExchangeRecord(AsyncTestCase):
         assert self.hashid == record.hashid
 
         record = SchemaExchangeRecord(
-            payload=self.payload, author=self.author, hashid=self.hashid)
+            payload=self.payload, author=self.author, hashid=self.hashid
+        )
         assert self.hashid == record.hashid
 
     async def testSaveAndRetrieve(self):
         context = InjectionContext()
         storage = BasicStorage()
         context.injector.bind_instance(BaseStorage, storage)
+
         record = SchemaExchangeRecord(payload=self.payload, author=self.author)
         record_id = await record.save(context)
+
         query = await SchemaExchangeRecord.retrieve_by_hashid(context, record.hashid)
         assert query == record
+        query = await SchemaExchangeRecord.retrieve_by_id(context, record._id)
+        assert query == record
+        query = await SchemaExchangeRecord.query(
+            context, tag_filter={"hashid": record.hashid}
+        )
+        assert query[0] == record
 
         # query = await SchemaExchangeRecord.query(context, post_filter_positive={"hashid": record.hashid})
         # assert query == self.payload

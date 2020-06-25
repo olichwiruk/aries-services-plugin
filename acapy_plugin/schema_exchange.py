@@ -89,9 +89,7 @@ class SchemaExchangeHandler(BaseHandler):
         )
         assert isinstance(context.message, SchemaExchange)
 
-        record = SchemaExchangeRecord(
-            author="other", payload=context.message.payload
-        )
+        record = SchemaExchangeRecord(author="other", payload=context.message.payload)
 
         # Add record to storage
         try:
@@ -123,22 +121,16 @@ class SendHandler(BaseHandler):
             await responder.send_reply(report)
             return
 
-
         # Send based on connection id
         message = SchemaExchange(payload=context.message.payload)
         await responder.send(message, connection_id=connection.connection_id)
 
         # Create record to store localy
-        record = SchemaExchangeRecord(
-            payload=context.message.payload,
-            author="self"
-        )
+        record = SchemaExchangeRecord(payload=context.message.payload, author="self")
 
         # Add record to storage
         try:
-            await record.save(
-                context, reason="Send a SchemaExchange proposal"
-            )
+            await record.save(context, reason="Send a SchemaExchange proposal")
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
             report.assign_thread_from(context.message)
@@ -158,15 +150,16 @@ class GetHandler(BaseHandler):
 
         ## Search for record
         try:
-            record = await SchemaExchangeRecord.retrieve_by_hashid(context, context.message.hashid)
-            self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", records)
+            record = await SchemaExchangeRecord.retrieve_by_hashid(
+                context, context.message.hashid
+            )
+            self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", record)
         except StorageNotFoundError:
             report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
             report.assign_thread_from(context.message)
             await responder.send_reply(report)
             return
 
-        record = record[0]
         # Pack and reply
         reply = Get(hashid=record.hashid, payload=record.value)
         reply.assign_thread_from(context.message)
