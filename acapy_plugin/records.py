@@ -15,6 +15,7 @@ class SchemaExchangeRecord(BaseRecord):
     AUTHOR_SELF = "self"
     STATE_SENT = "sent"
     STATE_RECV = "recv"
+    RECORD_ID_NAME = "hashid"
 
     class Meta:
         schema_class = "SchemaExchangeRecordSchema"

@@ -143,7 +143,7 @@ class SendResponseHandler(BaseHandler):
             return
 
         try:
-            record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_hashid(
+            record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
                 context, context.message.hashid
             )
         except StorageNotFoundError:
@@ -216,7 +216,7 @@ class GetHandler(BaseHandler):
         ## Search for record
         try:
             record = await SchemaExchangeRecord.retrieve_by_id(
-                context, context.message.hashid
+                context=context, record_id=context.message.hashid
             )
             self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", record)
         except StorageNotFoundError:

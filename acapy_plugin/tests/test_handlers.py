@@ -37,7 +37,7 @@ class TestSchemaExchangeGetHandler(AsyncTestCase):
         assert len(messages) == 1
         result, target = messages[0]
         isinstance(result, Get)
-        assert result.hashid == record.hashid
+        assert result.payload["payload"] == record.payload
 
 
 class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
