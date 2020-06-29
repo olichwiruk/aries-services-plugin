@@ -140,14 +140,12 @@ class SendResponseHandler(BaseHandler):
 
         self._logger.debug("SendResponseHandler retrieved schema %s", record)
 
-        # Send based on connection id
-        message = SchemaExchange(payload=context.message.payload + record.payload)
+        # Send based on connection id to the peer agent
+        message = SchemaExchange(payload=context.message.payload)
         await responder.send(message, connection_id=connection.connection_id)
 
-        # Pack and reply
-        reply = SendResponse(
-            payload=context.message.payload + record.payload, hashid=record.hashid
-        )
+        # Pack and reply to the admin
+        reply = SendResponse(payload=record.payload, hashid=context.message.hashid)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 
