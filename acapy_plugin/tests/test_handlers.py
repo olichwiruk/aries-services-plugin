@@ -1,5 +1,6 @@
 from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.messaging.responder import BaseResponder, MockResponder
+from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.messaging.request_context import RequestContext
 from aries_cloudagent.storage.base import BaseStorage, StorageRecord
 from aries_cloudagent.storage.basic import BasicStorage
@@ -31,8 +32,23 @@ class TestSchemaExchangeGetHandler(AsyncTestCase):
 
         handler = GetHandler()
         await handler.handle(ctx, responder)
+
         messages = responder.messages
         assert len(messages) == 1
         result, target = messages[0]
         isinstance(result, Get)
         assert result.hashid == record.hashid
+
+
+class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
+    payload = '{"Test": Payload}'
+    hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
+    author = "self"
+
+    async def testHandler(self):
+        context = InjectionContext()
+        storage = BasicStorage()
+        responder = MockResponder()
+        ctx = RequestContext(base_context=context)
+        context.injector.bind_instance(BaseStorage, storage)
+
