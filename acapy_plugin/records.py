@@ -11,11 +11,11 @@ from typing import Mapping, Any
 
 class SchemaExchangeRecord(BaseRecord):
     RECORD_TYPE = "SchemaExchange"
+    RECORD_ID_NAME = "hashid"
     AUTHOR_OTHER = "other"
     AUTHOR_SELF = "self"
     STATE_SENT = "sent"
     STATE_RECV = "recv"
-    RECORD_ID_NAME = "hashid"
 
     class Meta:
         schema_class = "SchemaExchangeRecordSchema"
@@ -90,5 +90,4 @@ class SchemaExchangeRecordSchema(BaseRecordSchema):
 
     author = fields.Str(required=False)
     payload = fields.Str(required=False)
-    hashid = fields.Str(required=False)
     state = fields.Str(required=False)

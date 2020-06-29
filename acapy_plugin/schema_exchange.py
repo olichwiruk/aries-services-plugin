@@ -54,20 +54,6 @@ SchemaExchange, SchemaExchangeSchema = generate_model_schema(
 )
 
 
-Send, SendSchema = generate_model_schema(
-    name="Send",
-    handler=f"{PROTOCOL_PACKAGE}.SendHandler",
-    msg_type=SEND,
-    schema={
-        # request
-        "payload": fields.Str(required=True),
-        "connection_id": fields.Str(required=True),
-        # response
-        "hashid": fields.Str(required=False),
-    },
-)
-
-
 Get, GetSchema = generate_model_schema(
     name="Get",
     handler=f"{PROTOCOL_PACKAGE}.GetHandler",
@@ -166,6 +152,20 @@ class SendResponseHandler(BaseHandler):
         await responder.send_reply(reply)
 
 
+Send, SendSchema = generate_model_schema(
+    name="Send",
+    handler=f"{PROTOCOL_PACKAGE}.SendHandler",
+    msg_type=SEND,
+    schema={
+        # request
+        "payload": fields.Str(required=True),
+        "connection_id": fields.Str(required=True),
+        # response
+        "hashid": fields.Str(required=False),
+    },
+)
+
+
 class SendHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         self._logger.debug(
@@ -195,7 +195,7 @@ class SendHandler(BaseHandler):
 
         # Add record to storage
         try:
-            await record.save(context, reason="Send a SchemaExchange proposal")
+            hashid = await record.save(context, reason="Send a SchemaExchange proposal")
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
             report.assign_thread_from(context.message)
@@ -203,7 +203,7 @@ class SendHandler(BaseHandler):
             return
 
         # Pack and reply
-        reply = Send(payload=record.payload, hashid=record.hashid)
+        reply = Send(payload=record.payload, hashid=hashid)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 
