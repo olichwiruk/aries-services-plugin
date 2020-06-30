@@ -56,17 +56,32 @@ class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
 
     @pytest.mark.asyncio
     async def testHandler(self):
-        ctx = RequestContext()
-        ctx.connection_record = ConnectionRecord(connection_id="1234")
-        ctx.connection_ready = True
+        context = RequestContext()
+        context.connection_record = ConnectionRecord(connection_id="1234")
+        context.connection_ready = True
         storage = BasicStorage()
         responder = MockResponder()
-        ctx.injector.bind_instance(BaseStorage, storage)
-        ctx.message = SchemaExchange(payload=self.payload, hashid="hashid")
+        context.injector.bind_instance(BaseStorage, storage)
+        context.message = SchemaExchange(payload=self.payload, hashid="hashid")
 
         handler = SchemaExchangeHandler()
-        await handler.handle(ctx, responder)
-        record = await SchemaExchangeRecord.retrieve_by_id(ctx, self.hashid)
+        await handler.handle(context, responder)
+
+        record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
         assert record.payload == self.payload
-        assert ctx.connection_record.connection_id == record.connection_id
+        assert context.connection_record.connection_id == record.connection_id
+
+        messages = responder.messages
+        assert len(messages) == 0
+        hooks = responder.webhooks
+        assert len(hooks) == 1
+        assert hooks[0] == (
+            "schema_exchange",
+            {
+                "hashid": self.hashid,
+                "connection_id": context.connection_record.connection_id,
+                "payload": self.payload,
+                "state": "pending",
+            },
+        )
 

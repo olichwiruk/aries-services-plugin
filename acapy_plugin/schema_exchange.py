@@ -75,12 +75,24 @@ class SchemaExchangeHandler(BaseHandler):
 
         # Add record to storage
         try:
-            await record.save(context, reason="Saved, SchemaExchange from Other agent")
+            hashid = await record.save(
+                context, reason="Saved, SchemaExchange from Other agent"
+            )
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
             report.assign_thread_from(context.message)
             await responder.send_reply(report)
             return
+
+        await responder.send_webhook(
+            "schema_exchange",
+            {
+                "hashid": hashid,
+                "connection_id": context.connection_record.connection_id,
+                "payload": context.message.payload,
+                "state": "pending",
+            },
+        )
 
 
 SendResponse, SendResponseSchema = generate_model_schema(
