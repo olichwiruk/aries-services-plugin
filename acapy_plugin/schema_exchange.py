@@ -184,7 +184,9 @@ class GetHandler(BaseHandler):
             )
             self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", record)
         except StorageNotFoundError:
-            await problemReportHandle(context, "RecordNotFound")
+            report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
             return
 
         # Pack and reply
