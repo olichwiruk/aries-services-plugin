@@ -46,7 +46,8 @@ class TestSchemaExchangeGetHandler(AsyncTestCase):
         assert len(messages) == 1
         result, target = messages[0]
         isinstance(result, Get)
-        assert result.payload["payload"] == record.payload
+        assert result.payload == record.payload
+        assert result.connection_id == record.connection_id
 
 
 class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
@@ -62,7 +63,7 @@ class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
         storage = BasicStorage()
         responder = MockResponder()
         context.injector.bind_instance(BaseStorage, storage)
-        context.message = SchemaExchange(payload=self.payload, hashid="hashid")
+        context.message = SchemaExchange(payload=self.payload)
 
         handler = SchemaExchangeHandler()
         await handler.handle(context, responder)

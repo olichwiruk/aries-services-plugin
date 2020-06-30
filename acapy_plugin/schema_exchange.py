@@ -51,7 +51,7 @@ SchemaExchange, SchemaExchangeSchema = generate_model_schema(
     name="SchemaExchange",
     handler=f"{PROTOCOL_PACKAGE}.SchemaExchangeHandler",
     msg_type=SCHEMA_EXCHANGE,
-    schema={"payload": fields.Str(required=True), "hashid": fields.Str(required=False)},
+    schema={"payload": fields.Str(required=True)},
 )
 
 # Should this be named Receive ? Feels wrong to create a receive class when sending
@@ -193,6 +193,7 @@ class SendHandler(BaseHandler):
             payload=context.message.payload,
             author="self",
             state=SchemaExchangeRecord.STATE_PENDING,
+            connection_id=context.message.connection_id,
         )
 
         # Add record to storage
@@ -205,7 +206,11 @@ class SendHandler(BaseHandler):
             return
 
         # Pack and reply
-        reply = Send(payload=record.payload, hashid=hashid)
+        reply = Send(
+            payload=record.payload,
+            hashid=hashid,
+            connection_id=context.message.connection_id,
+        )
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 
@@ -219,6 +224,8 @@ Get, GetSchema = generate_model_schema(
         "hashid": fields.Str(required=True),
         # response
         "payload": fields.Str(required=False),
+        "state": fields.Str(required=False),
+        "connection_id": fields.Str(require=False),
     },
 )
 
@@ -230,7 +237,7 @@ class GetHandler(BaseHandler):
 
         ## Search for record
         try:
-            record = await SchemaExchangeRecord.retrieve_by_id(
+            record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
                 context=context, record_id=context.message.hashid
             )
             self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", record)
@@ -241,7 +248,12 @@ class GetHandler(BaseHandler):
             return
 
         # Pack and reply
-        reply = Get(hashid=context.message.hashid, payload=record.value)
+        reply = Get(
+            hashid=context.message.hashid,
+            payload=record.payload,
+            connection_id=record.connection_id,
+            state=record.state,
+        )
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 
