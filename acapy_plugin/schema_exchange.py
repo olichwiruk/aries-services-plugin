@@ -44,9 +44,6 @@ MESSAGE_TYPES = {
     SCHEMA_EXCHANGE: f"{PROTOCOL_PACKAGE}.SchemaExchange",
 }
 
-## Important agent messages
-
-
 SchemaExchange, SchemaExchangeSchema = generate_model_schema(
     name="SchemaExchange",
     handler=f"{PROTOCOL_PACKAGE}.SchemaExchangeHandler",
@@ -93,61 +90,6 @@ class SchemaExchangeHandler(BaseHandler):
                 "state": "pending",
             },
         )
-
-
-SendResponse, SendResponseSchema = generate_model_schema(
-    name="SendResponse",
-    handler=f"{PROTOCOL_PACKAGE}.SendResponseHandler",
-    msg_type=SEND_RESPONSE,
-    schema={
-        "payload": fields.Str(required=True),
-        "connection_id": fields.Str(required=True),
-        "hashid": fields.Str(required=True),
-        "state": fields.Str(required=True),
-    },
-)
-
-
-class SendResponseHandler(BaseHandler):
-    async def handle(self, context: RequestContext, responder: BaseResponder):
-        self._logger.debug(
-            "SCHEMA_EXCHANGE_SendResponseHandler called with context %s", context
-        )
-        assert isinstance(context.message, SendResponse)
-
-        # Get connection based on send message -> connection_id
-        try:
-            connection = await ConnectionRecord.retrieve_by_id(
-                context, context.message.connection_id
-            )
-        except StorageNotFoundError:
-            report = ProblemReport(
-                explain_ltxt="Connection not found.", who_retries="none"
-            )
-            report.assign_thread_from(context.message)
-            await responder.send_reply(report)
-            return
-
-        try:
-            record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
-                context, context.message.hashid
-            )
-        except StorageNotFoundError:
-            report = ProblemReport(explain_ltxt="Record not found.", who_retries="none")
-            report.assign_thread_from(context.message)
-            await responder.send_reply(report)
-            return
-
-        self._logger.debug("SendResponseHandler retrieved schema %s", record)
-
-        # Send based on connection id to the peer agent
-        message = SchemaExchange(payload=context.message.payload)
-        await responder.send(message, connection_id=connection.connection_id)
-
-        # Pack and reply to the admin
-        reply = SendResponse(payload=record.payload, hashid=context.message.hashid)
-        reply.assign_thread_from(context.message)
-        await responder.send_reply(reply)
 
 
 Send, SendSchema = generate_model_schema(
@@ -242,9 +184,7 @@ class GetHandler(BaseHandler):
             )
             self._logger.debug("GetHandler SchemaExchangeRecord Query : %s", record)
         except StorageNotFoundError:
-            report = ProblemReport(explain_ltxt="RecordNotFound", who_retries="none")
-            report.assign_thread_from(context.message)
-            await responder.send_reply(report)
+            await problemReportHandle(context, "RecordNotFound")
             return
 
         # Pack and reply
@@ -254,6 +194,61 @@ class GetHandler(BaseHandler):
             connection_id=record.connection_id,
             state=record.state,
         )
+        reply.assign_thread_from(context.message)
+        await responder.send_reply(reply)
+
+
+SendResponse, SendResponseSchema = generate_model_schema(
+    name="SendResponse",
+    handler=f"{PROTOCOL_PACKAGE}.SendResponseHandler",
+    msg_type=SEND_RESPONSE,
+    schema={
+        "payload": fields.Str(required=True),
+        "connection_id": fields.Str(required=True),
+        "hashid": fields.Str(required=True),
+        "state": fields.Str(required=True),
+    },
+)
+
+
+class SendResponseHandler(BaseHandler):
+    async def handle(self, context: RequestContext, responder: BaseResponder):
+        self._logger.debug(
+            "SCHEMA_EXCHANGE_SendResponseHandler called with context %s", context
+        )
+        assert isinstance(context.message, SendResponse)
+
+        # Get connection based on send message -> connection_id
+        try:
+            connection = await ConnectionRecord.retrieve_by_id(
+                context, context.message.connection_id
+            )
+        except StorageNotFoundError:
+            report = ProblemReport(
+                explain_ltxt="Connection not found.", who_retries="none"
+            )
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
+            return
+
+        try:
+            record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
+                context, context.message.hashid
+            )
+        except StorageNotFoundError:
+            report = ProblemReport(explain_ltxt="Record not found.", who_retries="none")
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
+            return
+
+        self._logger.debug("SendResponseHandler retrieved schema %s", record)
+
+        # Send based on connection id to the peer agent
+        message = SchemaExchange(payload=context.message.payload)
+        await responder.send(message, connection_id=connection.connection_id)
+
+        # Pack and reply to the admin
+        reply = SendResponse(payload=record.payload, hashid=context.message.hashid)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
 

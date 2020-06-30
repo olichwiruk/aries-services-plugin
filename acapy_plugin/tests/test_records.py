@@ -45,51 +45,5 @@ class TestSchemaExchangeRecord(AsyncTestCase):
         assert record.author == self.author
         assert record.state == self.state
 
-        # query = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
-        # assert query == record
-
-        # query = await SchemaExchangeRecord.query(
-        #     context, tag_filter={"hashid": record.hashid}
-        # )
-        # assert query[0] == record
-
-        # query = await SchemaExchangeRecord.query(context, post_filter_positive={"hashid": record.hashid})
-        # assert query == self.payload
-
-    # async def test_query(self):
-    #     context = InjectionContext(enforce_typing=False)
-    #     mock_storage = async_mock.MagicMock(BaseStorage, autospec=True)
-    #     context.injector.bind_instance(BaseStorage, mock_storage)
-    #     record_id = "record_id"
-    #     record_value = {"created_at": time_now(), "updated_at": time_now()}
-    #     tag_filter = {"tag": "filter"}
-    #     stored = StorageRecord(
-    #         BaseRecordImpl.RECORD_TYPE, json.dumps(record_value), {}, record_id
-    #     )
-
-    #     mock_storage.search_records.return_value.__aiter__.return_value = [stored]
-    #     result = await BaseRecordImpl.query(context, tag_filter)
-    #     mock_storage.search_records.assert_called_once_with(
-    #         BaseRecordImpl.RECORD_TYPE, tag_filter, None, {"retrieveTags": False}
-    #     )
-    #     assert result and isinstance(result[0], BaseRecordImpl)
-    #     assert result[0]._id == record_id
-    #     assert result[0].value == record_value
-
-    # async def test_post_save_exist(self):
-    #     context = InjectionContext(enforce_typing=False)
-    #     mock_storage = async_mock.MagicMock()
-    #     mock_storage.update_record_value = async_mock.CoroutineMock()
-    #     mock_storage.update_record_tags = async_mock.CoroutineMock()
-    #     context.injector.bind_instance(BaseStorage, mock_storage)
-    #     record = BaseRecordImpl()
-    #     last_state = "last_state"
-    #     record._last_state = last_state
-    #     record._id = "id"
-    #     with async_mock.patch.object(
-    #         record, "post_save", async_mock.CoroutineMock()
-    #     ) as post_save:
-    #         await record.save(context, reason="reason", webhook=False)
-    #         post_save.assert_called_once_with(context, False, last_state, False)
-    #     mock_storage.update_record_value.assert_called_once()
-    #     mock_storage.update_record_tags.assert_called_once()
+        query = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
+        assert query == record
