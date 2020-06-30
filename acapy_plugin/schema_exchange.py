@@ -67,9 +67,10 @@ class SchemaExchangeHandler(BaseHandler):
         assert isinstance(context.message, SchemaExchange)
 
         record = SchemaExchangeRecord(
-            author=context.connection_record.connection_id,
             payload=context.message.payload,
+            author=SchemaExchangeRecord.AUTHOR_OTHER,
             state=SchemaExchangeRecord.STATE_PENDING,
+            connection_id=context.connection_record.connection_id,
         )
 
         # Add record to storage

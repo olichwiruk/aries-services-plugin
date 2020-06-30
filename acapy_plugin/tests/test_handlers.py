@@ -6,12 +6,14 @@ from aries_cloudagent.storage.base import BaseStorage, StorageRecord
 from aries_cloudagent.storage.basic import BasicStorage
 from asynctest import TestCase as AsyncTestCase, mock as async_mock
 from ..records import SchemaExchangeRecord, SchemaExchangeRecordSchema
-from ..schema_exchange import GetHandler, Get
+from ..schema_exchange import *
+
 
 import hashlib
 from marshmallow import fields
 from unittest import mock, TestCase
 import json
+import pytest
 
 
 class TestSchemaExchangeGetHandler(AsyncTestCase):
@@ -52,10 +54,19 @@ class TestSchemaExchangeSendResponseHandler(AsyncTestCase):
     hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
     author = "self"
 
+    @pytest.mark.asyncio
     async def testHandler(self):
-        context = InjectionContext()
+        ctx = RequestContext()
+        ctx.connection_record = ConnectionRecord(connection_id="1234")
+        ctx.connection_ready = True
         storage = BasicStorage()
         responder = MockResponder()
-        ctx = RequestContext(base_context=context)
-        context.injector.bind_instance(BaseStorage, storage)
+        ctx.injector.bind_instance(BaseStorage, storage)
+        ctx.message = SchemaExchange(payload=self.payload, hashid="hashid")
+
+        handler = SchemaExchangeHandler()
+        await handler.handle(ctx, responder)
+        record = await SchemaExchangeRecord.retrieve_by_id(ctx, self.hashid)
+        assert record.payload == self.payload
+        assert ctx.connection_record.connection_id == record.connection_id
 
