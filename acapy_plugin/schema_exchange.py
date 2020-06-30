@@ -46,27 +46,13 @@ MESSAGE_TYPES = {
 
 ## Important agent messages
 
+
 SchemaExchange, SchemaExchangeSchema = generate_model_schema(
     name="SchemaExchange",
     handler=f"{PROTOCOL_PACKAGE}.SchemaExchangeHandler",
     msg_type=SCHEMA_EXCHANGE,
     schema={"payload": fields.Str(required=True), "hashid": fields.Str(required=False)},
 )
-
-
-Get, GetSchema = generate_model_schema(
-    name="Get",
-    handler=f"{PROTOCOL_PACKAGE}.GetHandler",
-    msg_type=GET,
-    schema={
-        # request
-        "hashid": fields.Str(required=True),
-        # response
-        "payload": fields.Str(required=False),
-    },
-)
-
-## Handlers
 
 # Should this be named Receive ? Feels wrong to create a receive class when sending
 # something to someone and I dont want class for sending and receiveing so schema exchange for now
@@ -81,9 +67,9 @@ class SchemaExchangeHandler(BaseHandler):
         assert isinstance(context.message, SchemaExchange)
 
         record = SchemaExchangeRecord(
-            author="other",
+            author=context.connection_record.connection_id,
             payload=context.message.payload,
-            state=SchemaExchangeRecord.STATE_RECV,
+            state=SchemaExchangeRecord.STATE_PENDING,
         )
 
         # Add record to storage
@@ -104,6 +90,7 @@ SendResponse, SendResponseSchema = generate_model_schema(
         "payload": fields.Str(required=True),
         "connection_id": fields.Str(required=True),
         "hashid": fields.Str(required=True),
+        "state": fields.Str(required=True),
     },
 )
 
@@ -189,7 +176,11 @@ class SendHandler(BaseHandler):
         await responder.send(message, connection_id=connection.connection_id)
 
         # Create record to store localy
-        record = SchemaExchangeRecord(payload=context.message.payload, author="self")
+        record = SchemaExchangeRecord(
+            payload=context.message.payload,
+            author="self",
+            state=SchemaExchangeRecord.STATE_PENDING,
+        )
 
         # Add record to storage
         try:
@@ -204,6 +195,19 @@ class SendHandler(BaseHandler):
         reply = Send(payload=record.payload, hashid=hashid)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
+
+
+Get, GetSchema = generate_model_schema(
+    name="Get",
+    handler=f"{PROTOCOL_PACKAGE}.GetHandler",
+    msg_type=GET,
+    schema={
+        # request
+        "hashid": fields.Str(required=True),
+        # response
+        "payload": fields.Str(required=False),
+    },
+)
 
 
 class GetHandler(BaseHandler):
@@ -227,3 +231,4 @@ class GetHandler(BaseHandler):
         reply = Get(hashid=context.message.hashid, payload=record.value)
         reply.assign_thread_from(context.message)
         await responder.send_reply(reply)
+

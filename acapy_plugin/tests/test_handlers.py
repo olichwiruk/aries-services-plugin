@@ -18,6 +18,8 @@ class TestSchemaExchangeGetHandler(AsyncTestCase):
     payload = "{Test Payload}"
     hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
     author = "self"
+    connection_id = "1234"
+    state = "pending"
 
     async def testGetHandler(self):
         context = InjectionContext()
@@ -26,7 +28,12 @@ class TestSchemaExchangeGetHandler(AsyncTestCase):
         responder = MockResponder()
         context.injector.bind_instance(BaseStorage, storage)
 
-        record = SchemaExchangeRecord(payload=self.payload, author=self.author)
+        record = SchemaExchangeRecord(
+            payload=self.payload,
+            author=self.author,
+            state=self.state,
+            connection_id=self.connection_id,
+        )
         await record.save(context)
         ctx.message = Get(hashid=self.hashid)
 

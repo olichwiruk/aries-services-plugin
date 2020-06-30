@@ -14,8 +14,10 @@ class SchemaExchangeRecord(BaseRecord):
     RECORD_ID_NAME = "hashid"
     AUTHOR_OTHER = "other"
     AUTHOR_SELF = "self"
-    STATE_SENT = "sent"
-    STATE_RECV = "recv"
+
+    STATE_PENDING = "pending"
+    STATE_ACCEPTED = "accepted"
+    STATE_REJECTED = "rejected"
 
     class Meta:
         schema_class = "SchemaExchangeRecordSchema"
@@ -24,19 +26,24 @@ class SchemaExchangeRecord(BaseRecord):
         self,
         payload: str,
         author: str,
+        state: str,
+        connection_id: str,
         *,
-        state: str = None,
         hashid: str = None,
         **kwargs,
     ):
-        super().__init__(hashid, state or self.STATE_SENT, **kwargs)
+        super().__init__(hashid, state, **kwargs)
         self.author = author
         self.payload = payload
+        self.connection_id = connection_id
 
     @property
     def record_value(self) -> dict:
         """Get record value."""
-        return {prop: getattr(self, prop) for prop in ("payload", "author")}
+        return {
+            prop: getattr(self, prop)
+            for prop in ("payload", "author", "connection_id", "state")
+        }
 
     async def save(
         self,
