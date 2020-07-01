@@ -1,5 +1,10 @@
-from .schema_exchange import MESSAGE_TYPES as SCHEMA_EXCHANGE_MESSAGE_TYPES
+PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/schema-exchange/1.0"
+PROTOCOL_PACKAGE = "acapy_plugin.schema_exchange"
 
-MESSAGE_TYPES = {}
-MESSAGE_TYPES.update(SCHEMA_EXCHANGE_MESSAGE_TYPES)
+SCHEMA_EXCHANGE = f"{PROTOCOL_URI}/schema-exchange"
+SCHEMA_EXCHANGE_RESPONSE = f"{PROTOCOL_URI}/schema-exchange-response"
 
+MESSAGE_TYPES = {
+    SCHEMA_EXCHANGE: f"{PROTOCOL_PACKAGE}.SchemaExchange",
+    SCHEMA_EXCHANGE_RESPONSE: f"{PROTOCOL_PACKAGE}.SchemaExchangeResponse",
+}
