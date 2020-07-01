@@ -51,7 +51,6 @@ class SendSchemaResponse(Schema):
     hashid = fields.Str(required=True)
     # TODO: decision
     state = fields.Str(required=True)
-    connection_id = fields.Str(required=True)
 
 
 @docs(tags=["Schema Exchange"], summary="Send response to the pending schema request")
@@ -63,15 +62,17 @@ async def sendResponse(request: web.BaseRequest):
     logger = logging.getLogger(__name__)
     logger.debug(
         "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \nstate:%s \nhashid: %s \npayload: %s",
-        params["connection_id"],
         params["state"],
         params["hashid"],
         params["payload"],
     )
 
     try:
+        record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
+            context, params["hashid"]
+        )
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, params["connection_id"]
+            context, record.connection_id
         )
     except StorageNotFoundError:
         raise web.HTTPNotFound()
