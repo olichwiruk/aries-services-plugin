@@ -14,6 +14,12 @@ from ..schema_exchange import SchemaExchange
 
 
 class TestSchemaExchangeRoutes(AsyncTestCase):
+    payload = "{Test Payload}"
+    hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
+    author = "self"
+    connection_id = "1234"
+    state = "pending"
+
     async def testSend(self):
         context = RequestContext(base_context=InjectionContext())
         requestMock = async_mock.MagicMock()
