@@ -106,6 +106,7 @@ class SchemaExchangeResponseHandler(BaseHandler):
         decision = context.message.decision
         payload = context.message.payload
         connection_id = context.connection_record.connection_id
+        hashid = None
 
         self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
         assert isinstance(context.message, SchemaExchangeResponse)
