@@ -1,14 +1,13 @@
-"""Basic message admin routes."""
+from aries_cloudagent.connections.models.connection_record import ConnectionRecord
+from aries_cloudagent.messaging.valid import UUIDFour
+from aries_cloudagent.storage.error import StorageNotFoundError
 
 from aiohttp import web
 from aiohttp_apispec import docs, match_info_schema, request_schema
 
 from marshmallow import fields, Schema
 import logging
-
-from aries_cloudagent.connections.models.connection_record import ConnectionRecord
-from aries_cloudagent.messaging.valid import UUIDFour
-from aries_cloudagent.storage.error import StorageNotFoundError
+import hashlib
 
 from .schema_exchange import SchemaExchange
 from .records import SchemaExchangeRecord
@@ -41,8 +40,13 @@ async def send(request: web.BaseRequest):
         message = SchemaExchange(payload=params["payload"])
         await outbound_handler(message, connection_id=connection.connection_id)
 
+    hashid = hashlib.sha256(self.payload.encode("UTF-8")).hexdigest()
     return web.json_response(
-        {"payload": message.payload, "connection_id": params["connection_id"]}
+        {
+            "payload": message.payload,
+            "connection_id": params["connection_id"],
+            "hashid": hashid,
+        }
     )
 
 

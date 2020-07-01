@@ -31,7 +31,6 @@ from .util import *
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/schema-exchange/1.0"
 PROTOCOL_PACKAGE = "acapy_plugin.schema_exchange"
 
-
 SCHEMA_EXCHANGE = f"{PROTOCOL_URI}/schema-exchange"
 
 MESSAGE_TYPES = {
