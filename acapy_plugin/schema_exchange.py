@@ -32,15 +32,9 @@ PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/schema-exchange/1.0"
 PROTOCOL_PACKAGE = "acapy_plugin.schema_exchange"
 
 
-SEND = f"{PROTOCOL_URI}/send"
-GET = f"{PROTOCOL_URI}/get"
-SEND_RESPONSE = f"{PROTOCOL_URI}/send-response"
 SCHEMA_EXCHANGE = f"{PROTOCOL_URI}/schema-exchange"
 
 MESSAGE_TYPES = {
-    SEND: f"{PROTOCOL_PACKAGE}.Send",
-    GET: f"{PROTOCOL_PACKAGE}.Get",
-    SEND_RESPONSE: f"{PROTOCOL_PACKAGE}.SendResponse",
     SCHEMA_EXCHANGE: f"{PROTOCOL_PACKAGE}.SchemaExchange",
 }
 
