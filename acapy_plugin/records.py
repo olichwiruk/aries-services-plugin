@@ -99,3 +99,45 @@ class SchemaExchangeRecordSchema(BaseRecordSchema):
     payload = fields.Str(required=False)
     state = fields.Str(required=False)
 
+
+class SchemaExchangeRequestRecord(BaseRecord):
+    RECORD_TYPE = "SchemaExchangeRequest"
+    AUTHOR_SELF = "self"
+
+    STATE_PENDING = "pending"
+    STATE_ACCEPTED = "accepted"
+    STATE_REJECTED = "rejected"
+
+    class Meta:
+        schema_class = "SchemaExchangeRequestRecordSchema"
+
+    def __init__(
+        self,
+        *,
+        id: str = None,
+        payload: str = None,
+        author_connection_id: str = AUTHOR_SELF,
+        state: str = STATE_PENDING,
+        **kwargs,
+    ):
+        super().__init__(id=id, state=state, **kwargs)
+        # NOTE: it takes value of "self" if its self authored
+        self.author_connection_id = author_connection_id
+        self.payload = payload
+
+    @property
+    def record_value(self) -> dict:
+        """Get record value."""
+        return {
+            prop: getattr(self, prop)
+            for prop in ("payload", "author_connection_id", "state")
+        }
+
+
+class SchemaExchangeRequestRecordSchema(BaseRecordSchema):
+    class Meta:
+        model_class = "SchemaExchangeRequest"
+
+    author_connection_id = fields.Str(required=False)
+    payload = fields.Str(required=False)
+    state = fields.Str(required=False)
