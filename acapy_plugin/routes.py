@@ -9,7 +9,7 @@ from marshmallow import fields, Schema
 import logging
 import hashlib
 
-from .schema_exchange import SchemaExchange
+import acapy_plugin.schema_exchange as schema_exchange
 from .records import SchemaExchangeRecord
 
 
@@ -37,10 +37,10 @@ async def send(request: web.BaseRequest):
         raise web.HTTPNotFound()
 
     if connection.is_ready:
-        message = SchemaExchange(payload=params["payload"])
+        message = schema_exchange.Request(payload=params["payload"])
         await outbound_handler(message, connection_id=connection.connection_id)
 
-    hashid = hashlib.sha256(self.payload.encode("UTF-8")).hexdigest()
+    hashid = hashlib.sha256(message.payload.encode("UTF-8")).hexdigest()
     return web.json_response(
         {
             "payload": message.payload,
@@ -64,8 +64,10 @@ async def sendResponse(request: web.BaseRequest):
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
     logger = logging.getLogger(__name__)
+
     logger.debug(
         "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \nstate:%s \nhashid: %s \npayload: %s",
+        params["connection_id"],
         params["state"],
         params["hashid"],
         params["payload"],
@@ -82,7 +84,9 @@ async def sendResponse(request: web.BaseRequest):
         raise web.HTTPNotFound()
 
     if connection.is_ready:
-        message = SchemaExchange(payload=params["payload"])
+        message = schema_exchange.Response(
+            payload=params["payload"], decision=params["state"]
+        )
         await outbound_handler(message, connection_id=connection.connection_id)
 
     return web.json_response(
@@ -90,7 +94,6 @@ async def sendResponse(request: web.BaseRequest):
             "payload": message.payload,
             "connection_id": params["connection_id"],
             "state": params["state"],
-            "hashid": params["hashid"],
         }
     )
 

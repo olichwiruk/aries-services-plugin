@@ -56,7 +56,6 @@ class RequestHandler(BaseHandler):
             connection_id=context.connection_record.connection_id,
         )
 
-        # Add record to storage
         try:
             hashid = await record.save(
                 context, reason="Saved, Request from Other agent"
@@ -92,6 +91,7 @@ Response, ResponseSchema = generate_model_schema(
 class ResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
+        
         decision = context.message.decision
         payload = context.message.payload
         connection_id = context.connection_record.connection_id
@@ -102,7 +102,7 @@ class ResponseHandler(BaseHandler):
 
         # NOTE: Create and save accepted record to storage
         if decision == SchemaExchangeRecord.STATE_ACCEPTED:
-
+            self._logger.debug("\nState: Accepted")
             record = SchemaExchangeRecord(
                 payload=payload,
                 author=SchemaExchangeRecord.AUTHOR_OTHER,

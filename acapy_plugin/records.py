@@ -98,3 +98,4 @@ class SchemaExchangeRecordSchema(BaseRecordSchema):
     author = fields.Str(required=False)
     payload = fields.Str(required=False)
     state = fields.Str(required=False)
+
