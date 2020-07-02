@@ -27,13 +27,11 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         responder = MockResponder()
         context.injector.bind_instance(BaseStorage, storage)
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
-        context.message = SchemaExchangeResponse(
-            decision=decision, payload=self.payload
-        )
+        context.message = Response(decision=decision, payload=self.payload)
         assert context.message.decision == decision
         assert context.message.payload == self.payload
 
-        handler = SchemaExchangeResponseHandler()
+        handler = ResponseHandler()
         await handler.handle(context, responder)
 
         record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
@@ -60,13 +58,11 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         responder = MockResponder()
         context.injector.bind_instance(BaseStorage, storage)
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
-        context.message = SchemaExchangeResponse(
-            decision=decision, payload=self.payload
-        )
+        context.message = Response(decision=decision, payload=self.payload)
         assert context.message.decision == decision
         assert context.message.payload == self.payload
 
-        handler = SchemaExchangeResponseHandler()
+        handler = ResponseHandler()
         await handler.handle(context, responder)
 
         record = None

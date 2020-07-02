@@ -10,10 +10,10 @@ from asynctest import mock as async_mock
 from aiohttp import web as aio_web
 import hashlib
 
-from ..schema_exchange import SchemaExchange
+from ..schema_exchange import Request
 
 
-class TestSchemaExchangeRoutes(AsyncTestCase):
+class TestRequestRoutes(AsyncTestCase):
     payload = "{Test Payload}"
     hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
     author = "self"

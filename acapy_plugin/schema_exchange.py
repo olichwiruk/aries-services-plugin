@@ -28,26 +28,26 @@ from .records import SchemaExchangeRecord
 from .util import *
 from .message_types import *
 
-SchemaExchange, SchemaExchangeSchema = generate_model_schema(
-    name="SchemaExchange",
-    handler=f"{PROTOCOL_PACKAGE}.SchemaExchangeHandler",
-    msg_type=SCHEMA_EXCHANGE,
+Request, RequestSchema = generate_model_schema(
+    name="Request",
+    handler=f"{PROTOCOL_PACKAGE}.RequestHandler",
+    msg_type=REQUEST,
     schema={"payload": fields.Str(required=True)},
 )
 
 # Should this be named Receive ? Feels wrong to create a receive class when sending
 # something to someone and I dont want class for sending and receiveing so schema exchange for now
 # TODO: Figure out how to notify about saved record
-class SchemaExchangeHandler(BaseHandler):
+class RequestHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         self._logger.debug(
-            "SCHEMA_EXCHANGE SchemaExchange called with context %s, \n\nRESPONDER: %s",
+            "SCHEMA_EXCHANGE Request called with context %s, \n\nRESPONDER: %s",
             context,
             responder,
         )
-        assert isinstance(context.message, SchemaExchange)
+        assert isinstance(context.message, Request)
 
         record = SchemaExchangeRecord(
             payload=context.message.payload,
@@ -59,7 +59,7 @@ class SchemaExchangeHandler(BaseHandler):
         # Add record to storage
         try:
             hashid = await record.save(
-                context, reason="Saved, SchemaExchange from Other agent"
+                context, reason="Saved, Request from Other agent"
             )
         except StorageDuplicateError:
             report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
@@ -78,10 +78,10 @@ class SchemaExchangeHandler(BaseHandler):
         )
 
 
-SchemaExchangeResponse, SchemaExchangeResponseSchema = generate_model_schema(
-    name="SchemaExchangeResponse",
-    handler=f"{PROTOCOL_PACKAGE}.SchemaExchangeResponseHandler",
-    msg_type=SCHEMA_EXCHANGE,
+Response, ResponseSchema = generate_model_schema(
+    name="Response",
+    handler=f"{PROTOCOL_PACKAGE}.ResponseHandler",
+    msg_type=RESPONSE,
     schema={
         "decision": fields.Str(required=True),
         "payload": fields.Str(required=False),
@@ -89,7 +89,7 @@ SchemaExchangeResponse, SchemaExchangeResponseSchema = generate_model_schema(
 )
 
 
-class SchemaExchangeResponseHandler(BaseHandler):
+class ResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
         decision = context.message.decision
@@ -98,7 +98,7 @@ class SchemaExchangeResponseHandler(BaseHandler):
         hashid = None
 
         self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
-        assert isinstance(context.message, SchemaExchangeResponse)
+        assert isinstance(context.message, Response)
 
         # NOTE: Create and save accepted record to storage
         if decision == SchemaExchangeRecord.STATE_ACCEPTED:
