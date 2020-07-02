@@ -24,7 +24,7 @@ import hashlib
 import uuid
 
 # Internal
-from .records import SchemaExchangeRecord
+from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
 from .util import *
 from .message_types import *
 
@@ -35,9 +35,7 @@ Request, RequestSchema = generate_model_schema(
     schema={"payload": fields.Str(required=True)},
 )
 
-# Should this be named Receive ? Feels wrong to create a receive class when sending
-# something to someone and I dont want class for sending and receiveing so schema exchange for now
-# TODO: Figure out how to notify about saved record
+# TODO: Figure out how to handle web hook
 class RequestHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
@@ -49,19 +47,19 @@ class RequestHandler(BaseHandler):
         )
         assert isinstance(context.message, Request)
 
-        record = SchemaExchangeRecord(
+        record = SchemaExchangeRequestRecord(
             payload=context.message.payload,
-            author=SchemaExchangeRecord.AUTHOR_OTHER,
-            state=SchemaExchangeRecord.STATE_PENDING,
+            author=SchemaExchangeRequestRecord.AUTHOR_OTHER,
+            state=SchemaExchangeRequestRecord.STATE_PENDING,
             connection_id=context.connection_record.connection_id,
         )
 
         try:
-            hashid = await record.save(
+            record_id = await record.save(
                 context, reason="Saved, Request from Other agent"
             )
-        except StorageDuplicateError:
-            report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
+        except StorageNotFoundError:
+            report = ProblemReport(explain_ltxt="StorageNotFound", who_retries="none")
             report.assign_thread_from(context.message)
             await responder.send_reply(report)
             return
@@ -69,10 +67,11 @@ class RequestHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": hashid,
+                "id": record_id,
+                "hashid": record.hashid,
                 "connection_id": context.connection_record.connection_id,
-                "payload": context.message.payload,
-                "state": "pending",
+                "payload": record.payload,
+                "state": record.state,
             },
         )
 
@@ -91,7 +90,7 @@ Response, ResponseSchema = generate_model_schema(
 class ResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
-        
+
         decision = context.message.decision
         payload = context.message.payload
         connection_id = context.connection_record.connection_id

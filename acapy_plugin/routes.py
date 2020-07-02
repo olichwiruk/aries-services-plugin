@@ -8,9 +8,10 @@ from aiohttp_apispec import docs, match_info_schema, request_schema
 from marshmallow import fields, Schema
 import logging
 import hashlib
+from typing import Sequence
 
 import acapy_plugin.schema_exchange as schema_exchange
-from .records import SchemaExchangeRecord
+from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
 
 
 class SendSchema(Schema):
@@ -40,12 +41,20 @@ async def send(request: web.BaseRequest):
         message = schema_exchange.Request(payload=params["payload"])
         await outbound_handler(message, connection_id=connection.connection_id)
 
-    hashid = hashlib.sha256(message.payload.encode("UTF-8")).hexdigest()
+    record = SchemaExchangeRequestRecord(
+        payload=message.payload,
+        connection_id=params["connection_id"],
+        state=SchemaExchangeRequestRecord.STATE_PENDING,
+        author=SchemaExchangeRequestRecord.AUTHOR_SELF,
+    )
+
+    record.save(context, reason="Saved SchemaExchangeRequest")
+
     return web.json_response(
         {
             "payload": message.payload,
             "connection_id": params["connection_id"],
-            "hashid": hashid,
+            "hashid": record.hashid,
         }
     )
 
@@ -54,7 +63,7 @@ class SendSchemaResponse(Schema):
     payload = fields.Str(required=True)
     hashid = fields.Str(required=True)
     # TODO: decision
-    state = fields.Str(required=True)
+    decision = fields.Str(required=True)
 
 
 @docs(tags=["Schema Exchange"], summary="Send response to the pending schema request")
@@ -66,17 +75,18 @@ async def sendResponse(request: web.BaseRequest):
     logger = logging.getLogger(__name__)
 
     logger.debug(
-        "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \nstate:%s \nhashid: %s \npayload: %s",
+        "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \ndecision:%s \nhashid: %s \npayload: %s",
         params["connection_id"],
-        params["state"],
+        params["decision"],
         params["hashid"],
         params["payload"],
     )
 
     try:
-        record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
+        record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
             context, params["hashid"]
         )
+        logger.debug("\n\nSchemaExchangeRequestRecord query: %s", record)
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, record.connection_id
         )
@@ -85,15 +95,18 @@ async def sendResponse(request: web.BaseRequest):
 
     if connection.is_ready:
         message = schema_exchange.Response(
-            payload=params["payload"], decision=params["state"]
+            payload=params["payload"], decision=params["decision"]
         )
         await outbound_handler(message, connection_id=connection.connection_id)
+
+        record.state = params["decision"]
+        record.save(context)
 
     return web.json_response(
         {
             "payload": message.payload,
             "connection_id": params["connection_id"],
-            "state": params["state"],
+            "decision": params["decision"],
         }
     )
 
@@ -109,6 +122,29 @@ async def get(request: web.BaseRequest):
         record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
             context=context, record_id=params["hashid"]
         )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound()
+
+    return web.json_response(
+        {
+            "hashid": params["hashid"],
+            "payload": record.payload,
+            "state": record.state,
+            "author": record.author,
+            "connection_id": record.connection_id,
+        }
+    )
+
+
+@docs(tags=["Schema Exchange"], summary="Get schema by schema id")
+async def getRequestList(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = request.match_info
+    logger = logging.getLogger(__name__)
+    logger.debug("ROUTES SCHEMA EXCHANGE GET hashid: %s", params["hashid"])
+
+    try:
+        record = await SchemaExchangeRequestRecord.query(context)
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
