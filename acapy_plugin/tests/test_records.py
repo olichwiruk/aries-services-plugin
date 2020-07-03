@@ -73,7 +73,10 @@ class TestSchemaExchangeRequestRecord(AsyncTestCase):
         context.injector.bind_instance(BaseStorage, storage)
 
         record = SchemaExchangeRequestRecord(
-            payload=self.payload, state=self.state, connection_id=self.connection_id,
+            payload=self.payload,
+            state=self.state,
+            connection_id=self.connection_id,
+            author="other",
         )
 
         record_id = await record.save(context)

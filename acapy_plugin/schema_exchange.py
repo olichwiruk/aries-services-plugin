@@ -67,8 +67,7 @@ class RequestHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "id": record_id,
-                "hashid": record.hashid,
+                "hashid": record_id,
                 "connection_id": context.connection_record.connection_id,
                 "payload": record.payload,
                 "state": record.state,
@@ -82,6 +81,7 @@ Response, ResponseSchema = generate_model_schema(
     msg_type=RESPONSE,
     schema={
         "decision": fields.Str(required=True),
+        "hashid": fields.Str(required=True),
         "payload": fields.Str(required=False),
     },
 )
@@ -90,14 +90,28 @@ Response, ResponseSchema = generate_model_schema(
 class ResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
+        self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
+        assert isinstance(context.message, Response)
 
         decision = context.message.decision
         payload = context.message.payload
         connection_id = context.connection_record.connection_id
-        hashid = None
+        hashid = context.message.hashid
 
-        self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
-        assert isinstance(context.message, Response)
+        try:
+            request_record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
+                context, hashid
+            )
+        except StorageNotFoundError:
+            report = ProblemReport(
+                explain_ltxt="RequestRecordNotFound", who_retries="none"
+            )
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
+            return
+
+        request_record.state = decision
+        await request_record.save(context)
 
         # NOTE: Create and save accepted record to storage
         if decision == SchemaExchangeRecord.STATE_ACCEPTED:

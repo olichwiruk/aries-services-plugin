@@ -118,11 +118,11 @@ class SchemaExchangeRequestRecord(BaseRecord):
 
     def __init__(
         self,
-        *,
         payload: str = None,
         author: str = None,
-        connection_id: str = AUTHOR_SELF,
-        state: str = STATE_PENDING,
+        connection_id: str = None,
+        state: str = None,
+        *,
         hashid: str = None,
         **kwargs,
     ):
@@ -164,7 +164,8 @@ class SchemaExchangeRequestRecord(BaseRecord):
             self.updated_at = time_now()
             storage: BaseStorage = await context.inject(BaseStorage)
             if not self._id:
-                self._id = hashlib.sha256(self.payload.encode("UTF-8")).hexdigest()
+                content = self.payload + self.author + self.connection_id + self.state
+                self._id = hashlib.sha256(content.encode("UTF-8")).hexdigest()
                 self.created_at = self.updated_at
                 await storage.add_record(self.storage_record)
                 new_record = True

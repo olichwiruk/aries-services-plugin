@@ -1,6 +1,6 @@
 from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.messaging.valid import UUIDFour
-from aries_cloudagent.storage.error import StorageNotFoundError
+from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
 
 from aiohttp import web
 from aiohttp_apispec import docs, match_info_schema, request_schema
@@ -34,7 +34,7 @@ async def send(request: web.BaseRequest):
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, params["connection_id"]
         )
-    except StorageNotFoundError:
+    except StorageNotFoundError and StorageDuplicateError:
         raise web.HTTPNotFound()
 
     if connection.is_ready:
@@ -122,29 +122,6 @@ async def get(request: web.BaseRequest):
         record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
             context=context, record_id=params["hashid"]
         )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound()
-
-    return web.json_response(
-        {
-            "hashid": params["hashid"],
-            "payload": record.payload,
-            "state": record.state,
-            "author": record.author,
-            "connection_id": record.connection_id,
-        }
-    )
-
-
-@docs(tags=["Schema Exchange"], summary="Get schema by schema id")
-async def getRequestList(request: web.BaseRequest):
-    context = request.app["request_context"]
-    params = request.match_info
-    logger = logging.getLogger(__name__)
-    logger.debug("ROUTES SCHEMA EXCHANGE GET hashid: %s", params["hashid"])
-
-    try:
-        record = await SchemaExchangeRequestRecord.query(context)
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
