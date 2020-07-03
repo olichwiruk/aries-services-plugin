@@ -34,7 +34,7 @@ async def send(request: web.BaseRequest):
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, params["connection_id"]
         )
-    except StorageNotFoundError and StorageDuplicateError:
+    except StorageNotFoundError or StorageDuplicateError:
         raise web.HTTPNotFound()
 
     if connection.is_ready:
@@ -48,13 +48,16 @@ async def send(request: web.BaseRequest):
         author=SchemaExchangeRequestRecord.AUTHOR_SELF,
     )
 
-    record.save(context, reason="Saved SchemaExchangeRequest")
+    try:
+        record_hashid = await record.save(context, reason="Saved SchemaExchangeRequest")
+    except StorageDuplicateError:
+        raise web.HTTPConflict
 
     return web.json_response(
         {
             "payload": message.payload,
             "connection_id": params["connection_id"],
-            "hashid": record.hashid,
+            "hashid": record_hashid,
         }
     )
 
@@ -100,7 +103,7 @@ async def sendResponse(request: web.BaseRequest):
         await outbound_handler(message, connection_id=connection.connection_id)
 
         record.state = params["decision"]
-        record.save(context)
+        await record.save(context)
 
     return web.json_response(
         {
