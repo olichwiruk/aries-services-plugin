@@ -158,12 +158,38 @@ async def getRequest(request: web.BaseRequest):
     )
 
 
+async def getRequestList(request: web.BaseRequest):
+    context = request.app["request_context"]
+    logger = logging.getLogger(__name__)
+    try:
+        query = await SchemaExchangeRequestRecord.query(context)
+        logger.debug("RECORD_LIST %s", query)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound()
+
+    query_list = [
+        {
+            "payload": i.payload,
+            "author": i.author,
+            "connection_id": i.connection_id,
+            "record_id": i._id,
+            "state": i.state,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
+        }
+        for i in query
+    ]
+
+    return web.json_response(query_list)
+
+
 async def register(app: web.Application):
     app.add_routes(
         [
+            web.get("/schema-exchange/request-list", getRequestList),
             web.post("/schema-exchange/send", send),
             web.post("/schema-exchange/send-response", sendResponse),
-            web.get("/schema-exchange/{hashid}", get),
+            web.get("/schema-exchange/record/{hashid}", get),
             web.get("/schema-exchange/request/{record_id}", getRequest),
         ]
     )

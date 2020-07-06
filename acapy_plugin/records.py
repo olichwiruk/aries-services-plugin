@@ -104,7 +104,7 @@ class SchemaExchangeRecordSchema(BaseRecordSchema):
 
 class SchemaExchangeRequestRecord(BaseRecord):
     RECORD_TYPE = "SchemaExchangeRequest"
-    RECORD_ID_NAME = "hashid"
+    RECORD_ID_NAME = "record_id"
 
     AUTHOR_SELF = "self"
     AUTHOR_OTHER = "other"
@@ -123,10 +123,10 @@ class SchemaExchangeRequestRecord(BaseRecord):
         connection_id: str = None,
         state: str = None,
         *,
-        hashid: str = None,
+        record_id: str = None,
         **kwargs,
     ):
-        super().__init__(hashid, state, **kwargs)
+        super().__init__(record_id, state, **kwargs)
         self.author = author
         self.payload = payload
         self.connection_id = connection_id
