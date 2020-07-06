@@ -61,7 +61,7 @@ async def send(request: web.BaseRequest):
 
 class SendSchemaResponse(Schema):
     payload = fields.Str(required=True)
-    hashid = fields.Str(required=True)
+    request_id = fields.Str(required=True)
     decision = fields.Str(required=True)
 
 
@@ -73,17 +73,9 @@ async def sendResponse(request: web.BaseRequest):
     logger = logging.getLogger(__name__)
     params = await request.json()
 
-    logger.debug(
-        "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \ndecision:%s \nhashid: %s \npayload: %s",
-        params["connection_id"],
-        params["decision"],
-        params["hashid"],
-        params["payload"],
-    )
-
     try:
         record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
-            context, params["hashid"]
+            context, params["request_id"]
         )
         logger.debug("\n\nSchemaExchangeRequestRecord query: %s", record)
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
@@ -92,6 +84,7 @@ async def sendResponse(request: web.BaseRequest):
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
+    hashid = None
     if connection.is_ready:
         message = schema_exchange.Response(
             payload=params["payload"], decision=params["decision"]
@@ -99,10 +92,11 @@ async def sendResponse(request: web.BaseRequest):
         await outbound_handler(message, connection_id=connection.connection_id)
 
         record.state = params["decision"]
-        await record.save(context)
+        hashid = await record.save(context)
 
     return web.json_response(
         {
+            "hashid": hashid,
             "payload": message.payload,
             "connection_id": params["connection_id"],
             "decision": params["decision"],
@@ -135,6 +129,35 @@ async def get(request: web.BaseRequest):
     )
 
 
+async def getRequestList(request: web.BaseRequest):
+    context = request.app["request_context"]
+    logger = logging.getLogger(__name__)
+    params = await request.json()
+    # TODO: filters
+    positiveFilter = {"author": params["author"], "state": params["state"]}
+    logger.debug("Get Request List %s", positiveFilter)
+
+    try:
+        query = await SchemaExchangeRequestRecord.query(context)
+        logger.debug("RECORD_LIST %s", query)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound()
+
+    query_list = [
+        {
+            "payload": i.payload,
+            "author": i.author,
+            "connection_id": i.connection_id,
+            "hash_id": i._id,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
+        }
+        for i in query
+    ]
+
+    return web.json_response(query_list)
+
+
 @docs(tags=["Schema Exchange"], summary="Get schema request by schema id")
 async def getRequest(request: web.BaseRequest):
     context = request.app["request_context"]
@@ -158,11 +181,26 @@ async def getRequest(request: web.BaseRequest):
     )
 
 
+class GetRequestList(Schema):
+    state = fields.Str(required=False)
+    author = fields.Str(required=False)
+
+
 async def getRequestList(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
+    params = await request.json()
+
+    positiveFilter = {}
+    positiveFilter["author"] = params["author"]
+    positiveFilter["state"] = params["state"]
+
+    logger.debug("Get Request List %s", positiveFilter)
+
     try:
-        query = await SchemaExchangeRequestRecord.query(context)
+        query = await SchemaExchangeRequestRecord.query(
+            context, post_filter_positive=positiveFilter
+        )
         logger.debug("RECORD_LIST %s", query)
     except StorageNotFoundError:
         raise web.HTTPNotFound()
@@ -186,7 +224,7 @@ async def getRequestList(request: web.BaseRequest):
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.get("/schema-exchange/request-list", getRequestList),
+            web.post("/schema-exchange/request/list", getRequestList),
             web.post("/schema-exchange/send", send),
             web.post("/schema-exchange/send-response", sendResponse),
             web.get("/schema-exchange/record/{hashid}", get),

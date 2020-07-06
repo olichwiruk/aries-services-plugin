@@ -15,10 +15,6 @@ class SchemaExchangeRecord(BaseRecord):
     AUTHOR_OTHER = "other"
     AUTHOR_SELF = "self"
 
-    STATE_PENDING = "pending"
-    STATE_ACCEPTED = "accepted"
-    STATE_REJECTED = "rejected"
-
     class Meta:
         schema_class = "SchemaExchangeRecordSchema"
 

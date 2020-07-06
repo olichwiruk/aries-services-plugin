@@ -24,7 +24,7 @@ class TestSchemaExchangeResponse(AsyncTestCase):
     hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
 
     async def testHandlerAccept(self):
-        decision = SchemaExchangeRecord.STATE_ACCEPTED
+        decision = SchemaExchangeRequestRecord.STATE_ACCEPTED
         context = RequestContext()
         storage = BasicStorage()
         context.injector.bind_instance(BaseStorage, storage)
@@ -62,7 +62,7 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
 
     async def testHandlerReject(self):
-        decision = SchemaExchangeRecord.STATE_REJECTED
+        decision = SchemaExchangeRequestRecord.STATE_REJECTED
         context = RequestContext()
         context.connection_ready = True
         storage = BasicStorage()

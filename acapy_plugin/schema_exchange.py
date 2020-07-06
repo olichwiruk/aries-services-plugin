@@ -114,7 +114,7 @@ class ResponseHandler(BaseHandler):
         await request_record.save(context)
 
         # NOTE: Create and save accepted record to storage
-        if decision == SchemaExchangeRecord.STATE_ACCEPTED:
+        if decision == SchemaExchangeRequestRecord.STATE_ACCEPTED:
             self._logger.debug("\nState: Accepted")
             record = SchemaExchangeRecord(
                 payload=payload,
