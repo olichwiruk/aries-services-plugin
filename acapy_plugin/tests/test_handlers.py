@@ -32,11 +32,6 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         responder = MockResponder()
 
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
-        context.message = Response(
-            decision=decision, payload=self.payload, hashid=self.request_hash
-        )
-        assert context.message.decision == decision
-        assert context.message.payload == self.payload
 
         record = SchemaExchangeRequestRecord(
             payload=self.payload,
@@ -46,6 +41,9 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         )
 
         hash_id = await record.save(context)
+        context.message = Response(
+            decision=decision, payload=self.payload, hashid=hash_id
+        )
 
         handler = ResponseHandler()
         await handler.handle(context, responder)
@@ -100,7 +98,7 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         assert responder.webhooks[0] == (
             "schema_exchange",
             {
-                "hashid": self.request_hash,
+                "hashid": hash,
                 "connection_id": self.connection_id,
                 "payload": self.payload,
                 "state": decision,
