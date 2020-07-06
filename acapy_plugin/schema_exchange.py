@@ -35,7 +35,7 @@ Request, RequestSchema = generate_model_schema(
     schema={"payload": fields.Str(required=True)},
 )
 
-# TODO: Figure out how to handle web hook
+# TODO: how to use webhooks
 class RequestHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)

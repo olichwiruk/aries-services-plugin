@@ -28,9 +28,6 @@ async def send(request: web.BaseRequest):
     logger = logging.getLogger(__name__)
 
     try:
-        logger.debug(
-            "ROUTES SCHEMA EXCHANGE SEND connection_id:%s", params["connection_id"]
-        )
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, params["connection_id"]
         )
@@ -49,7 +46,7 @@ async def send(request: web.BaseRequest):
     )
 
     try:
-        record_hashid = await record.save(context, reason="Saved SchemaExchangeRequest")
+        record_id = await record.save(context, reason="Saved SchemaExchangeRequest")
     except StorageDuplicateError:
         raise web.HTTPConflict
 
@@ -57,7 +54,7 @@ async def send(request: web.BaseRequest):
         {
             "payload": message.payload,
             "connection_id": params["connection_id"],
-            "hashid": record_hashid,
+            "record_id": record_id,
         }
     )
 
@@ -65,17 +62,16 @@ async def send(request: web.BaseRequest):
 class SendSchemaResponse(Schema):
     payload = fields.Str(required=True)
     hashid = fields.Str(required=True)
-    # TODO: decision
     decision = fields.Str(required=True)
 
 
 @docs(tags=["Schema Exchange"], summary="Send response to the pending schema request")
 @request_schema(SendSchemaResponse())
 async def sendResponse(request: web.BaseRequest):
-    context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
-    params = await request.json()
+    context = request.app["request_context"]
     logger = logging.getLogger(__name__)
+    params = await request.json()
 
     logger.debug(
         "ROUTES SCHEMA EXCHANGE SEND RESPONSE \nconnection_id:%s \ndecision:%s \nhashid: %s \npayload: %s",
@@ -139,11 +135,35 @@ async def get(request: web.BaseRequest):
     )
 
 
+@docs(tags=["Schema Exchange"], summary="Get schema request by schema id")
+async def getRequest(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = request.match_info
+
+    try:
+        record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
+            context=context, record_id=params["record_id"]
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound()
+
+    return web.json_response(
+        {
+            "record_id": params["record_id"],
+            "payload": record.payload,
+            "state": record.state,
+            "author": record.author,
+            "connection_id": record.connection_id,
+        }
+    )
+
+
 async def register(app: web.Application):
     app.add_routes(
         [
             web.post("/schema-exchange/send", send),
             web.post("/schema-exchange/send-response", sendResponse),
             web.get("/schema-exchange/{hashid}", get),
+            web.get("/schema-exchange/request/{record_id}", getRequest),
         ]
     )
