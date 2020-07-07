@@ -7,6 +7,7 @@ from aries_cloudagent.messaging.util import datetime_to_str, time_now
 import hashlib
 from marshmallow import fields
 from typing import Mapping, Any
+import uuid
 
 
 class SchemaExchangeRecord(BaseRecord):
@@ -118,6 +119,7 @@ class SchemaExchangeRequestRecord(BaseRecord):
         author: str = None,
         connection_id: str = None,
         state: str = None,
+        cross_planetary_identification_number: str = None,
         *,
         record_id: str = None,
         **kwargs,
@@ -127,13 +129,45 @@ class SchemaExchangeRequestRecord(BaseRecord):
         self.payload = payload
         self.connection_id = connection_id
 
+        if cross_planetary_identification_number is None:
+            self.cross_planetary_identification_number = str(uuid.uuid4())
+        else:
+            self.cross_planetary_identification_number = (
+                cross_planetary_identification_number
+            )
+
     @property
     def record_value(self) -> dict:
         """Get record value."""
         return {
             prop: getattr(self, prop)
-            for prop in ("payload", "connection_id", "state", "author")
+            for prop in (
+                "payload",
+                "connection_id",
+                "state",
+                "author",
+                "cross_planetary_identification_number",
+            )
         }
+
+    @property
+    def record_tags(self) -> dict:
+        """Get tags for record."""
+        return {
+            "connection_id": self.connection_id,
+            "cross_planetary_identification_number": self.cross_planetary_identification_number,
+        }
+
+    @classmethod
+    async def retrieve_by_cross_planetary_identification_number(
+        cls, context: InjectionContext, cross_planetary_identification_number: str
+    ) -> "SchemaExchangeRequest":
+        return await cls.retrieve_by_tag_filter(
+            context,
+            {
+                "cross_planetary_identification_number": cross_planetary_identification_number
+            },
+        )
 
 
 class SchemaExchangeRequestRecordSchema(BaseRecordSchema):
@@ -144,3 +178,4 @@ class SchemaExchangeRequestRecordSchema(BaseRecordSchema):
     payload = fields.Str(required=False)
     state = fields.Str(required=False)
     author = fields.Str(required=False)
+    cross_planetary_identification_number = fields.Str(required=False)

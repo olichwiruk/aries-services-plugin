@@ -32,7 +32,10 @@ Request, RequestSchema = generate_model_schema(
     name="Request",
     handler=f"{PROTOCOL_PACKAGE}.RequestHandler",
     msg_type=REQUEST,
-    schema={"payload": fields.Str(required=True)},
+    schema={
+        "payload": fields.Str(required=True),
+        "cross_planetary_identification_number": fields.Str(required=True),
+    },
 )
 
 # TODO: how to use webhooks
@@ -52,6 +55,7 @@ class RequestHandler(BaseHandler):
             author=SchemaExchangeRequestRecord.AUTHOR_OTHER,
             state=SchemaExchangeRequestRecord.STATE_PENDING,
             connection_id=context.connection_record.connection_id,
+            cross_planetary_identification_number=context.message.cross_planetary_identification_number,
         )
 
         try:
@@ -71,6 +75,7 @@ class RequestHandler(BaseHandler):
                 "connection_id": context.connection_record.connection_id,
                 "payload": record.payload,
                 "state": record.state,
+                "cross_planetary_identification_number": record.cross_planetary_identification_number,
             },
         )
 
@@ -81,7 +86,7 @@ Response, ResponseSchema = generate_model_schema(
     msg_type=RESPONSE,
     schema={
         "decision": fields.Str(required=True),
-        "hashid": fields.Str(required=True),
+        "cross_planetary_identification_number": fields.Str(required=True),
         "payload": fields.Str(required=False),
     },
 )
@@ -96,13 +101,16 @@ class ResponseHandler(BaseHandler):
         decision = context.message.decision
         payload = context.message.payload
         connection_id = context.connection_record.connection_id
-        hashid = context.message.hashid
+        cross_planetary_identification_number = (
+            context.message.cross_planetary_identification_number
+        )
 
         try:
-            request_record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
-                context, hashid
+            request_record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_cross_planetary_identification_number(
+                context, cross_planetary_identification_number
             )
         except StorageNotFoundError:
+            self._logger.debug("RESPONSE HANDLER RETRIEVE ID ")
             report = ProblemReport(
                 explain_ltxt="RequestRecordNotFound", who_retries="none"
             )
@@ -113,10 +121,11 @@ class ResponseHandler(BaseHandler):
         request_record.state = decision
         await request_record.save(context)
 
-        # NOTE: Create and save accepted record to storage
+        hashid = SchemaExchangeRequestRecord.STATE_REJECTED
         if decision == SchemaExchangeRequestRecord.STATE_ACCEPTED:
-            self._logger.debug("\nState: Accepted")
-            record = SchemaExchangeRecord(
+
+            self._logger.debug("\nCONNECTION _ACCEPTED\n")
+            record: SchemaExchangeRecord = SchemaExchangeRecord(
                 payload=payload,
                 author=SchemaExchangeRecord.AUTHOR_OTHER,
                 state=decision,

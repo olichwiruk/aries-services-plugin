@@ -24,13 +24,14 @@ class TestSchemaExchangeResponse(AsyncTestCase):
     hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
 
     async def testHandlerAccept(self):
-        decision = SchemaExchangeRequestRecord.STATE_ACCEPTED
         context = RequestContext()
         storage = BasicStorage()
-        context.injector.bind_instance(BaseStorage, storage)
-        context.connection_ready = True
         responder = MockResponder()
 
+        context.injector.bind_instance(BaseStorage, storage)
+        decision = SchemaExchangeRequestRecord.STATE_ACCEPTED
+
+        context.connection_ready = True
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
 
         record = SchemaExchangeRequestRecord(
@@ -40,9 +41,11 @@ class TestSchemaExchangeResponse(AsyncTestCase):
             state=self.state,
         )
 
-        hash_id = await record.save(context)
+        await record.save(context)
         context.message = Response(
-            decision=decision, payload=self.payload, hashid=hash_id
+            decision=decision,
+            payload=self.payload,
+            cross_planetary_identification_number=record.cross_planetary_identification_number,
         )
 
         handler = ResponseHandler()
@@ -62,24 +65,31 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
 
     async def testHandlerReject(self):
-        decision = SchemaExchangeRequestRecord.STATE_REJECTED
         context = RequestContext()
-        context.connection_ready = True
         storage = BasicStorage()
         responder = MockResponder()
+
+        decision = SchemaExchangeRequestRecord.STATE_REJECTED
         context.injector.bind_instance(BaseStorage, storage)
+
+        context.connection_ready = True
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
 
         record = SchemaExchangeRequestRecord(
             payload=self.payload,
             author=self.author,
             connection_id=self.connection_id,
-            state="pending",
+            state=self.state,
         )
 
-        hash = await record.save(context)
+        await record.save(context)
+        record_id = record.cross_planetary_identification_number
 
-        context.message = Response(decision=decision, payload=self.payload, hashid=hash)
+        context.message = Response(
+            decision=decision,
+            payload=self.payload,
+            cross_planetary_identification_number=record.cross_planetary_identification_number,
+        )
         assert context.message.decision == decision
         assert context.message.payload == self.payload
 
@@ -98,7 +108,7 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         assert responder.webhooks[0] == (
             "schema_exchange",
             {
-                "hashid": hash,
+                "hashid": SchemaExchangeRequestRecord.STATE_REJECTED,
                 "connection_id": self.connection_id,
                 "payload": self.payload,
                 "state": decision,
