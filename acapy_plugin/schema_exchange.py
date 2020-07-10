@@ -50,16 +50,31 @@ class RequestHandler(BaseHandler):
         )
         assert isinstance(context.message, Request)
 
-        record = SchemaExchangeRequestRecord(
+        state = SchemaExchangeRequestRecord.STATE_REJECTED
+        try:
+            record = await SchemaExchangeRecord.retrieve_by_id(
+                context, context.message.payload
+            )
+            state = SchemaExchangeRequestRecord.STATE_ACCEPTED
+        except StorageNotFoundError:
+            response = Response(
+                decision="rejected",
+                cross_planetary_identification_number=context.message.cross_planetary_identification_number,
+                payload="STORAGE NOT FOUND",
+            )
+            response.assign_thread_from(context.message)
+            await responder.send_reply(response)
+
+        request_record = SchemaExchangeRequestRecord(
             payload=context.message.payload,
             author=SchemaExchangeRequestRecord.AUTHOR_OTHER,
-            state=SchemaExchangeRequestRecord.STATE_PENDING,
+            state=state,
             connection_id=context.connection_record.connection_id,
             cross_planetary_identification_number=context.message.cross_planetary_identification_number,
         )
 
         try:
-            record_id = await record.save(
+            request_record_id = await request_record.save(
                 context, reason="Saved, Request from Other agent"
             )
         except StorageNotFoundError:
@@ -71,13 +86,22 @@ class RequestHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": record_id,
+                "hashid": request_record_id,
                 "connection_id": context.connection_record.connection_id,
                 "payload": record.payload,
                 "state": record.state,
-                "cross_planetary_identification_number": record.cross_planetary_identification_number,
+                "cross_planetary_identification_number": context.message.cross_planetary_identification_number,
             },
         )
+
+        if state == SchemaExchangeRequestRecord.STATE_ACCEPTED:
+            response = Response(
+                decision="accepted",
+                cross_planetary_identification_number=context.message.cross_planetary_identification_number,
+                payload=record.payload,
+            )
+            response.assign_thread_from(context.message)
+            await responder.send_reply(response)
 
 
 Response, ResponseSchema = generate_model_schema(

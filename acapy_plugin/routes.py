@@ -14,14 +14,14 @@ import acapy_plugin.schema_exchange as schema_exchange
 from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
 
 
-class SendSchema(Schema):
-    payload = fields.Str(required=True)
+class SendRequestSchema(Schema):
+    hash_id = fields.Str(required=True)
     connection_id = fields.Str(required=True)
 
 
-@docs(tags=["Schema Exchange"], summary="Send a schema to the connection")
-@request_schema(SendSchema())
-async def send(request: web.BaseRequest):
+@docs(tags=["Schema Exchange"], summary="Request a schema by schema id")
+@request_schema(SendRequestSchema())
+async def sendRequest(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
@@ -35,7 +35,7 @@ async def send(request: web.BaseRequest):
         raise web.HTTPNotFound()
 
     record = SchemaExchangeRequestRecord(
-        payload=params["payload"],
+        payload=params["hash_id"],
         connection_id=params["connection_id"],
         state=SchemaExchangeRequestRecord.STATE_PENDING,
         author=SchemaExchangeRequestRecord.AUTHOR_SELF,
@@ -43,7 +43,7 @@ async def send(request: web.BaseRequest):
 
     if connection.is_ready:
         message = schema_exchange.Request(
-            payload=params["payload"],
+            payload=params["hash_id"],
             cross_planetary_identification_number=record.cross_planetary_identification_number,
         )
         await outbound_handler(message, connection_id=connection.connection_id)
@@ -55,67 +55,46 @@ async def send(request: web.BaseRequest):
 
     return web.json_response(
         {
-            "payload": params["payload"],
+            "hash_id": params["hash_id"],
             "connection_id": params["connection_id"],
             "record_id": record_id,
             "cross_planetary_identification_number": record.cross_planetary_identification_number,
+            "state": record.state,
         }
     )
 
 
-class SendSchemaResponse(Schema):
+class SendResponseSchema(Schema):
     payload = fields.Str(required=True)
     cross_planetary_identification_number = fields.Str(required=True)
     decision = fields.Str(required=True)
 
 
-## TODO: I need to figure out how to tell the second agent  which request are we talking about
-@docs(tags=["Schema Exchange"], summary="Send response to the pending schema request")
-@request_schema(SendSchemaResponse())
-async def sendResponse(request: web.BaseRequest):
-    outbound_handler = request.app["outbound_message_router"]
+class AddSchema(Schema):
+    payload = fields.Str(required=True)
+
+
+@docs(tags=["Schema Exchange"], summary="Add schema to storage")
+@request_schema(AddSchema())
+async def addSchema(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
     params = await request.json()
 
+    record = SchemaExchangeRecord(params["payload"], "self", "null", "null",)
+
     try:
-        record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_cross_planetary_identification_number(
-            context, params["cross_planetary_identification_number"]
-        )
-        logger.debug("\n\nSchemaExchangeRequestRecord query: %s", record)
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, record.connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound()
+        hash_id = await record.save(context)
+    except StorageDuplicateError:
+        raise web.HTTPConflict()
 
-    record_id = "Connection not ready"
-    if connection.is_ready:
-        logger.debug("\n\nCONNECTION SEND RESPONSE Connection_is_ready\n\n")
-        message = schema_exchange.Response(
-            payload=params["payload"],
-            decision=params["decision"],
-            cross_planetary_identification_number=params[
-                "cross_planetary_identification_number"
-            ],
-        )
-        await outbound_handler(message, connection_id=connection.connection_id)
-
-        record.state = params["decision"]
-        record_id = await record.save(context)
-
-    return web.json_response(
-        {
-            "record_id": record_id,
-            "payload": message.payload,
-            "connection_id": params["connection_id"],
-            "decision": params["decision"],
-            "cross_planetary_identification_number": record.cross_planetary_identification_number,
-        }
-    )
+    return web.json_response({"hash_id": hash_id, "payload": record.payload,})
 
 
-@docs(tags=["Schema Exchange"], summary="Get schema by schema id")
+"""DEBUG GETTERS"""
+
+
+@docs(tags=["Schema Exchange"], summary="Get schema record by schema id")
 async def get(request: web.BaseRequest):
     context = request.app["request_context"]
     params = request.match_info
@@ -140,6 +119,7 @@ async def get(request: web.BaseRequest):
     )
 
 
+@docs(tags=["Schema Exchange"], summary="Get schema record list")
 async def getSchemaExchangeRecords(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
@@ -184,6 +164,7 @@ async def getRequest(request: web.BaseRequest):
             "state": record.state,
             "author": record.author,
             "connection_id": record.connection_id,
+            "cross_planetary_identification_number": record.cross_planetary_identification_number,
         }
     )
 
@@ -193,14 +174,12 @@ class GetRequestList(Schema):
     author = fields.Str(required=False)
 
 
+@docs(tags=["Schema Exchange"], summary="Get schema request by list")
 async def getRequestList(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
     params = await request.json()
-
-    positiveFilter = {}
-    positiveFilter["author"] = params["author"]
-    positiveFilter["state"] = params["state"]
+    positiveFilter = params
 
     logger.debug("Get Request List %s", positiveFilter)
 
@@ -221,6 +200,7 @@ async def getRequestList(request: web.BaseRequest):
             "state": i.state,
             "created_at": i.created_at,
             "updated_at": i.updated_at,
+            "cross_planetary_identification_number": i.cross_planetary_identification_number,
         }
         for i in query
     ]
@@ -231,10 +211,10 @@ async def getRequestList(request: web.BaseRequest):
 async def register(app: web.Application):
     app.add_routes(
         [
+            web.post("/schema-exchange/request", sendRequest),
+            web.post("/schema-exchange/add", addSchema),
             web.post("/schema-exchange/request/list", getRequestList),
             web.post("/schema-exchange/records/list", getSchemaExchangeRecords),
-            web.post("/schema-exchange/send", send),
-            web.post("/schema-exchange/send-response", sendResponse),
             web.get("/schema-exchange/record/{hashid}", get),
             web.get("/schema-exchange/request/{record_id}", getRequest),
         ]
