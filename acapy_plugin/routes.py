@@ -43,7 +43,7 @@ async def sendRequest(request: web.BaseRequest):
 
     if connection.is_ready:
         message = schema_exchange.Request(
-            payload=params["hash_id"], exchange_id=record.exchange_id,
+            hash_id=params["hash_id"], exchange_id=record.exchange_id,
         )
         await outbound_handler(message, connection_id=connection.connection_id)
 

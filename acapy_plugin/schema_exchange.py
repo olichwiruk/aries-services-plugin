@@ -33,7 +33,7 @@ Request, RequestSchema = generate_model_schema(
     handler=f"{PROTOCOL_PACKAGE}.RequestHandler",
     msg_type=REQUEST,
     schema={
-        "payload": fields.Str(required=True),
+        "hash_id": fields.Str(required=True),
         "exchange_id": fields.Str(required=True),
     },
 )
@@ -53,12 +53,12 @@ class RequestHandler(BaseHandler):
         state = SchemaExchangeRequestRecord.STATE_REJECTED
         try:
             record = await SchemaExchangeRecord.retrieve_by_id(
-                context, context.message.payload
+                context, context.message.hash_id
             )
             state = SchemaExchangeRequestRecord.STATE_ACCEPTED
         except StorageNotFoundError:
             response = Response(
-                decision="rejected",
+                decision=state,
                 exchange_id=context.message.exchange_id,
                 payload="STORAGE NOT FOUND",
             )
@@ -66,7 +66,7 @@ class RequestHandler(BaseHandler):
             await responder.send_reply(response)
 
         request_record = SchemaExchangeRequestRecord(
-            payload=context.message.payload,
+            payload=context.message.hash_id,
             author=SchemaExchangeRequestRecord.AUTHOR_OTHER,
             state=state,
             connection_id=context.connection_record.connection_id,
@@ -74,9 +74,7 @@ class RequestHandler(BaseHandler):
         )
 
         try:
-            request_record_id = await request_record.save(
-                context, reason="Saved, Request from Other agent"
-            )
+            await request_record.save(context, reason="Saved, Request from Other agent")
         except StorageNotFoundError:
             report = ProblemReport(explain_ltxt="StorageNotFound", who_retries="none")
             report.assign_thread_from(context.message)
@@ -86,17 +84,17 @@ class RequestHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": request_record_id,
+                "hash_id": context.message.hash_id,
                 "connection_id": context.connection_record.connection_id,
-                "payload": record.payload,
-                "state": record.state,
+                "decision": state,
                 "exchange_id": context.message.exchange_id,
+                "payload": record.payload,
             },
         )
 
         if state == SchemaExchangeRequestRecord.STATE_ACCEPTED:
             response = Response(
-                decision="accepted",
+                decision=state,
                 exchange_id=context.message.exchange_id,
                 payload=record.payload,
             )

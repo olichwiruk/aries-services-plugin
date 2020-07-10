@@ -44,7 +44,8 @@ class SchemaExchangeRecord(BaseRecord):
 
     @property
     def record_tags(self) -> dict:
-        """Get tags for record."""
+        """Get tags for record, 
+            NOTE: relevent when filtering by tags"""
         return {
             "payload": self.payload,
             "author": self.author,
@@ -154,7 +155,8 @@ class SchemaExchangeRequestRecord(BaseRecord):
 
     @property
     def record_tags(self) -> dict:
-        """Get tags for record."""
+        """Get tags for record, 
+            NOTE: relevent when filtering by tags"""
         return {
             "connection_id": self.connection_id,
             "exchange_id": self.exchange_id,
