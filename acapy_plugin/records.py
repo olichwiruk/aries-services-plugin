@@ -42,6 +42,15 @@ class SchemaExchangeRecord(BaseRecord):
             for prop in ("payload", "author", "connection_id", "state")
         }
 
+    @property
+    def record_tags(self) -> dict:
+        """Get tags for record."""
+        return {
+            "payload": self.payload,
+            "author": self.author,
+            "connection_id": self.connection_id,
+        }
+
     async def save(
         self,
         context: InjectionContext,
@@ -58,9 +67,10 @@ class SchemaExchangeRecord(BaseRecord):
             reason: A reason to add to the log
             log_params: Additional parameters to log
             webhook: Flag to override whether the webhook is sent
+
+         NOTE: only deviation from the standard
+               is in id generation (hash based on payload)
         """
-        # NOTE: only deviation from the standard
-        #       is in id generation (hash based on payload)
         new_record = None
         log_reason = reason or ("Updated record" if self._id else "Created record")
         try:
@@ -119,7 +129,7 @@ class SchemaExchangeRequestRecord(BaseRecord):
         author: str = None,
         connection_id: str = None,
         state: str = None,
-        cross_planetary_identification_number: str = None,
+        exchange_id: str = None,
         *,
         record_id: str = None,
         **kwargs,
@@ -129,25 +139,17 @@ class SchemaExchangeRequestRecord(BaseRecord):
         self.payload = payload
         self.connection_id = connection_id
 
-        if cross_planetary_identification_number is None:
-            self.cross_planetary_identification_number = str(uuid.uuid4())
+        if exchange_id is None:
+            self.exchange_id = str(uuid.uuid4())
         else:
-            self.cross_planetary_identification_number = (
-                cross_planetary_identification_number
-            )
+            self.exchange_id = exchange_id
 
     @property
     def record_value(self) -> dict:
         """Get record value."""
         return {
             prop: getattr(self, prop)
-            for prop in (
-                "payload",
-                "connection_id",
-                "state",
-                "author",
-                "cross_planetary_identification_number",
-            )
+            for prop in ("payload", "connection_id", "state", "author", "exchange_id",)
         }
 
     @property
@@ -155,19 +157,14 @@ class SchemaExchangeRequestRecord(BaseRecord):
         """Get tags for record."""
         return {
             "connection_id": self.connection_id,
-            "cross_planetary_identification_number": self.cross_planetary_identification_number,
+            "exchange_id": self.exchange_id,
         }
 
     @classmethod
-    async def retrieve_by_cross_planetary_identification_number(
-        cls, context: InjectionContext, cross_planetary_identification_number: str
+    async def retrieve_by_exchange_id(
+        cls, context: InjectionContext, exchange_id: str
     ) -> "SchemaExchangeRequest":
-        return await cls.retrieve_by_tag_filter(
-            context,
-            {
-                "cross_planetary_identification_number": cross_planetary_identification_number
-            },
-        )
+        return await cls.retrieve_by_tag_filter(context, {"exchange_id": exchange_id},)
 
 
 class SchemaExchangeRequestRecordSchema(BaseRecordSchema):
@@ -178,4 +175,4 @@ class SchemaExchangeRequestRecordSchema(BaseRecordSchema):
     payload = fields.Str(required=False)
     state = fields.Str(required=False)
     author = fields.Str(required=False)
-    cross_planetary_identification_number = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)

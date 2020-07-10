@@ -43,8 +43,7 @@ async def sendRequest(request: web.BaseRequest):
 
     if connection.is_ready:
         message = schema_exchange.Request(
-            payload=params["hash_id"],
-            cross_planetary_identification_number=record.cross_planetary_identification_number,
+            payload=params["hash_id"], exchange_id=record.exchange_id,
         )
         await outbound_handler(message, connection_id=connection.connection_id)
 
@@ -58,7 +57,7 @@ async def sendRequest(request: web.BaseRequest):
             "hash_id": params["hash_id"],
             "connection_id": params["connection_id"],
             "record_id": record_id,
-            "cross_planetary_identification_number": record.cross_planetary_identification_number,
+            "exchange_id": record.exchange_id,
             "state": record.state,
         }
     )
@@ -66,7 +65,7 @@ async def sendRequest(request: web.BaseRequest):
 
 class SendResponseSchema(Schema):
     payload = fields.Str(required=True)
-    cross_planetary_identification_number = fields.Str(required=True)
+    exchange_id = fields.Str(required=True)
     decision = fields.Str(required=True)
 
 
@@ -164,7 +163,7 @@ async def getRequest(request: web.BaseRequest):
             "state": record.state,
             "author": record.author,
             "connection_id": record.connection_id,
-            "cross_planetary_identification_number": record.cross_planetary_identification_number,
+            "exchange_id": record.exchange_id,
         }
     )
 
@@ -200,7 +199,7 @@ async def getRequestList(request: web.BaseRequest):
             "state": i.state,
             "created_at": i.created_at,
             "updated_at": i.updated_at,
-            "cross_planetary_identification_number": i.cross_planetary_identification_number,
+            "exchange_id": i.exchange_id,
         }
         for i in query
     ]
