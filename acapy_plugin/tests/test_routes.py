@@ -15,7 +15,7 @@ from ..schema_exchange import Request
 
 class TestRequestRoutes(AsyncTestCase):
     payload = "{Test Payload}"
-    hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
+    hash_id = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
     author = "self"
     connection_id = "1234"
     state = "pending"
@@ -28,7 +28,7 @@ class TestRequestRoutes(AsyncTestCase):
             "outbound_message_router": async_mock.CoroutineMock(),
         }
         params = {"connection_id": "1234", "payload": "test, test"}
-        hashid = hashlib.sha256(params["payload"].encode("UTF-8")).hexdigest()
+        hash_id = hashlib.sha256(params["payload"].encode("UTF-8")).hexdigest()
         requestMock.json = async_mock.CoroutineMock(return_value=params)
         ## TODO:
 

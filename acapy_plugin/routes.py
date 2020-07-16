@@ -3,7 +3,7 @@ from aries_cloudagent.messaging.valid import UUIDFour
 from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
 
 from aiohttp import web
-from aiohttp_apispec import docs, match_info_schema, request_schema
+from aiohttp_apispec import docs, match_info_schema, request_schema, response_schema
 
 from marshmallow import fields, Schema
 import logging
@@ -19,9 +19,13 @@ class SendRequestSchema(Schema):
     connection_id = fields.Str(required=True)
 
 
+class AddSchema(Schema):
+    payload = fields.Str(required=True)
+
+
 @docs(tags=["Schema Exchange"], summary="Request a schema by schema id")
 @request_schema(SendRequestSchema())
-async def sendRequest(request: web.BaseRequest):
+async def requestSchemaRecord(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
@@ -63,63 +67,41 @@ async def sendRequest(request: web.BaseRequest):
     )
 
 
-class SendResponseSchema(Schema):
-    payload = fields.Str(required=True)
-    exchange_id = fields.Str(required=True)
-    decision = fields.Str(required=True)
-
-
-class AddSchema(Schema):
-    payload = fields.Str(required=True)
-
-
-@docs(tags=["Schema Exchange"], summary="Add schema to storage")
+@docs(tags=["Schema Storage"], summary="Add schema to storage")
 @request_schema(AddSchema())
-async def addSchema(request: web.BaseRequest):
+async def addSchemaRecord(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
     params = await request.json()
 
-    record = SchemaExchangeRecord(params["payload"], "self", "null", "null",)
+    record = SchemaExchangeRecord(params["payload"], "self")
 
     try:
         hash_id = await record.save(context)
     except StorageDuplicateError:
-        raise web.HTTPConflict()
+        hash_id = hashlib.sha256(params["payload"].encode("UTF-8")).hexdigest()
+        record.retrieve_by_id(context, hash_id)
 
     return web.json_response({"hash_id": hash_id, "payload": record.payload,})
 
 
-"""DEBUG GETTERS"""
-
-
-@docs(tags=["Schema Exchange"], summary="Get schema record by schema id")
-async def get(request: web.BaseRequest):
+@docs(tags=["Schema Storage"], summary="Retrieve a schema record by it's hash_id")
+async def getSchemaRecord(request: web.BaseRequest):
     context = request.app["request_context"]
-    params = request.match_info
-    logger = logging.getLogger(__name__)
-    logger.debug("ROUTES SCHEMA EXCHANGE GET hashid: %s", params["hashid"])
+    hash_id = request.match_info["hash_id"]
 
     try:
         record: SchemaExchangeRecord = await SchemaExchangeRecord.retrieve_by_id(
-            context=context, record_id=params["hashid"]
+            context=context, record_id=hash_id
         )
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    return web.json_response(
-        {
-            "hashid": params["hashid"],
-            "payload": record.payload,
-            "state": record.state,
-            "author": record.author,
-            "connection_id": record.connection_id,
-        }
-    )
+    return web.json_response(record.serialize())
 
 
-@docs(tags=["Schema Exchange"], summary="Get schema record list")
-async def getSchemaExchangeRecords(request: web.BaseRequest):
+@docs(tags=["Schema Storage"], summary="Retrieve a list of schema records from storage")
+async def getSchemaRecordList(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
 
@@ -129,80 +111,26 @@ async def getSchemaExchangeRecords(request: web.BaseRequest):
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    query_list = [
-        {
-            "payload": i.payload,
-            "author": i.author,
-            "connection_id": i.connection_id,
-            "hash_id": i._id,
-            "created_at": i.created_at,
-            "updated_at": i.updated_at,
-        }
-        for i in query
-    ]
+    # create a list of serialized(in json format / dict format) records
+    query_list = [i.serialize() for i in query]
 
     return web.json_response(query_list)
 
 
-@docs(tags=["Schema Exchange"], summary="Get schema request by schema id")
-async def getRequest(request: web.BaseRequest):
+# Get schema request list
+async def DEBUGGetSchemaRequestList(request: web.BaseRequest):
     context = request.app["request_context"]
-    params = request.match_info
-
-    try:
-        record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_id(
-            context=context, record_id=params["record_id"]
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound()
-
-    return web.json_response(
-        {
-            "record_id": params["record_id"],
-            "payload": record.payload,
-            "state": record.state,
-            "author": record.author,
-            "connection_id": record.connection_id,
-            "exchange_id": record.exchange_id,
-        }
-    )
-
-
-class GetRequestList(Schema):
-    state = fields.Str(required=False)
-    author = fields.Str(required=False)
-
-
-@docs(tags=["Schema Exchange"], summary="Get schema request by list")
-async def getRequestList(request: web.BaseRequest):
-    context = request.app["request_context"]
-    logger = logging.getLogger(__name__)
     params = await request.json()
-    positiveFilter = params
-
-    logger.debug("Get Request List %s", positiveFilter)
 
     try:
         query = await SchemaExchangeRequestRecord.query(
-            context, post_filter_positive=positiveFilter
+            context, post_filter_positive=params
         )
-        logger.debug("RECORD_LIST %s", query)
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    query_list = [
-        {
-            "payload": i.payload,
-            "author": i.author,
-            "connection_id": i.connection_id,
-            "record_id": i._id,
-            "state": i.state,
-            "created_at": i.created_at,
-            "updated_at": i.updated_at,
-            "exchange_id": i.exchange_id,
-        }
-        for i in query
-    ]
+    # create a list of serialized(in json format / dict format) records
+    query_list = [i.serialize() for i in query]
 
     return web.json_response(query_list)
 
@@ -210,11 +138,10 @@ async def getRequestList(request: web.BaseRequest):
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.post("/schema-exchange/request", sendRequest),
-            web.post("/schema-exchange/add", addSchema),
-            web.post("/schema-exchange/request/list", getRequestList),
-            web.post("/schema-exchange/records/list", getSchemaExchangeRecords),
-            web.get("/schema-exchange/record/{hashid}", get),
-            web.get("/schema-exchange/request/{record_id}", getRequest),
+            web.post("/schema-exchange/request-schema", requestSchemaRecord),
+            web.post("/schema-storage/add", addSchemaRecord),
+            web.post("/schema-storage/list", getSchemaRecordList),
+            web.post("/schema-storage/debug/request/list", DEBUGGetSchemaRequestList),
+            web.get("/schema-storage/{hash_id}", getSchemaRecord, allow_head=False),
         ]
     )

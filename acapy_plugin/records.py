@@ -12,44 +12,35 @@ import uuid
 
 class SchemaExchangeRecord(BaseRecord):
     RECORD_TYPE = "SchemaExchange"
-    RECORD_ID_NAME = "hashid"
-    AUTHOR_OTHER = "other"
+    RECORD_ID_NAME = "hash_id"
     AUTHOR_SELF = "self"
 
     class Meta:
         schema_class = "SchemaExchangeRecordSchema"
 
     def __init__(
-        self,
-        payload: str,
-        author: str,
-        state: str,
-        connection_id: str,
-        *,
-        hashid: str = None,
-        **kwargs,
+        self, payload: str, author: str, *, hash_id: str = None, **kwargs,
     ):
-        super().__init__(hashid, state, **kwargs)
+        super().__init__(hash_id, None, **kwargs)
         self.author = author
         self.payload = payload
-        self.connection_id = connection_id
+
+    @property
+    def hash_id(self) -> str:
+        """Accessor for the ID associated with this connection."""
+        return self._id
 
     @property
     def record_value(self) -> dict:
         """Get record value."""
-        return {
-            prop: getattr(self, prop)
-            for prop in ("payload", "author", "connection_id", "state")
-        }
+        return {prop: getattr(self, prop) for prop in ("payload", "author")}
 
     @property
     def record_tags(self) -> dict:
-        """Get tags for record, 
-            NOTE: relevent when filtering by tags"""
+        """Get tags for record, NOTE: relevent when filtering by tags"""
         return {
             "payload": self.payload,
             "author": self.author,
-            "connection_id": self.connection_id,
         }
 
     async def save(
@@ -107,7 +98,7 @@ class SchemaExchangeRecordSchema(BaseRecordSchema):
 
     author = fields.Str(required=False)
     payload = fields.Str(required=False)
-    state = fields.Str(required=False)
+    hash_id = fields.Str(required=False)
 
 
 class SchemaExchangeRequestRecord(BaseRecord):
@@ -118,8 +109,8 @@ class SchemaExchangeRequestRecord(BaseRecord):
     AUTHOR_OTHER = "other"
 
     STATE_PENDING = "pending"
-    STATE_ACCEPTED = "accepted"
-    STATE_REJECTED = "rejected"
+    STATE_APPROVED = "approved"
+    STATE_DENIED = "failed to find the record"
 
     class Meta:
         schema_class = "SchemaExchangeRequestRecordSchema"
@@ -147,7 +138,7 @@ class SchemaExchangeRequestRecord(BaseRecord):
 
     @property
     def record_value(self) -> dict:
-        """Get record value."""
+        """Accessor to for the JSON record value properties"""
         return {
             prop: getattr(self, prop)
             for prop in ("payload", "connection_id", "state", "author", "exchange_id",)

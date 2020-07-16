@@ -50,15 +50,15 @@ class RequestHandler(BaseHandler):
         )
         assert isinstance(context.message, Request)
 
-        state = SchemaExchangeRequestRecord.STATE_REJECTED
+        state = SchemaExchangeRequestRecord.STATE_DENIED
         try:
             record = await SchemaExchangeRecord.retrieve_by_id(
                 context, context.message.hash_id
             )
-            state = SchemaExchangeRequestRecord.STATE_ACCEPTED
+            state = SchemaExchangeRequestRecord.STATE_APPROVED
         except StorageNotFoundError:
             response = Response(
-                decision=state,
+                state=state,
                 exchange_id=context.message.exchange_id,
                 payload="STORAGE NOT FOUND",
             )
@@ -86,15 +86,15 @@ class RequestHandler(BaseHandler):
             {
                 "hash_id": context.message.hash_id,
                 "connection_id": context.connection_record.connection_id,
-                "decision": state,
+                "state": state,
                 "exchange_id": context.message.exchange_id,
                 "payload": record.payload,
             },
         )
 
-        if state == SchemaExchangeRequestRecord.STATE_ACCEPTED:
+        if state == SchemaExchangeRequestRecord.STATE_APPROVED:
             response = Response(
-                decision=state,
+                state=state,
                 exchange_id=context.message.exchange_id,
                 payload=record.payload,
             )
@@ -107,7 +107,7 @@ Response, ResponseSchema = generate_model_schema(
     handler=f"{PROTOCOL_PACKAGE}.ResponseHandler",
     msg_type=RESPONSE,
     schema={
-        "decision": fields.Str(required=True),
+        "state": fields.Str(required=True),
         "exchange_id": fields.Str(required=True),
         "payload": fields.Str(required=False),
     },
@@ -120,10 +120,11 @@ class ResponseHandler(BaseHandler):
         self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
         assert isinstance(context.message, Response)
 
-        decision = context.message.decision
+        state = context.message.state
         payload = context.message.payload
         connection_id = context.connection_record.connection_id
         exchange_id = context.message.exchange_id
+        hash_id = None
 
         try:
             request_record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_exchange_id(
@@ -137,20 +138,18 @@ class ResponseHandler(BaseHandler):
             await responder.send_reply(report)
             return
 
-        request_record.state = decision
+        request_record.state = state
         await request_record.save(context)
 
-        hashid = SchemaExchangeRequestRecord.STATE_REJECTED
-        if decision == SchemaExchangeRequestRecord.STATE_ACCEPTED:
+        if state == SchemaExchangeRequestRecord.STATE_APPROVED:
+
+            # NOTE: Save the schema record to storage
             record: SchemaExchangeRecord = SchemaExchangeRecord(
-                payload=payload,
-                author=SchemaExchangeRecord.AUTHOR_OTHER,
-                state=decision,
-                connection_id=connection_id,
+                payload=payload, author=connection_id,
             )
 
             try:
-                hashid = await record.save(
+                hash_id = await record.save(
                     context, reason="Saved, SchemaExchange from Other agent"
                 )
             except StorageDuplicateError:
@@ -162,9 +161,9 @@ class ResponseHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": hashid,
+                "hash_id": hash_id,
                 "connection_id": connection_id,
                 "payload": payload,
-                "state": decision,
+                "state": state,
             },
         )
