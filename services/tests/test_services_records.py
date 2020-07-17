@@ -14,21 +14,22 @@ from ..records import *
 
 
 class TestServiceRecord(AsyncTestCase):
-    payload = '{"stuff": "yes"}'
     consentSchema = {
-        "did": "1234",
-        "name": "THE Authority",
-        "version": "1.0",
-        "description": "asdasdadasdasda",
-        "expiration": datetime.datetime.now().isoformat(),
-        "limitation": datetime.datetime.now().isoformat(),
-        "dictatedBy": "THE Authority",
-        "validityTTL": 1234,
+        "oca_schema_dri": "1234",
+        "oca_schema_namespace": "test",
+        "data_url": "http://test.com/test",
+    }
+
+    service_schema = {
+        "oca_schema_dri": "1234",
+        "oca_schema_namespace": "test",
     }
 
     def testInit(self):
-        record = ServiceRecord(payload=self.payload, consent_schema=self.consentSchema)
-        assert self.payload == record.payload
+        record = ServiceRecord(
+            service_schema=self.service_schema, consent_schema=self.consentSchema
+        )
+        assert self.service_schema == record.service_schema
         assert self.consentSchema == record.consent_schema
 
     async def testSaveAndRetrieve(self):
@@ -36,9 +37,11 @@ class TestServiceRecord(AsyncTestCase):
         storage = BasicStorage()
         context.injector.bind_instance(BaseStorage, storage)
 
-        record = ServiceRecord(payload=self.payload, consent_schema=self.consentSchema)
+        record = ServiceRecord(
+            service_schema=self.service_schema, consent_schema=self.consentSchema
+        )
         record_id = await record.save(context)
 
         await record.retrieve_by_id(context, record_id=record_id)
-        assert record.payload == self.payload
+        assert record.service_schema == self.service_schema
         assert record.consent_schema == self.consentSchema

@@ -10,11 +10,11 @@ import logging
 import hashlib
 from typing import Sequence
 
-from .records import ServiceRecord, ConsentSchema
+from .records import ServiceRecord, ConsentSchema, ServiceSchema
 
 
 class AddSchema(Schema):
-    payload = fields.Str(required=True)
+    service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
 
 
@@ -24,7 +24,7 @@ async def add(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
-    serviceRecord = ServiceRecord(params["payload"], params["consent_schema"])
+    serviceRecord = ServiceRecord(params["service_schema"], params["consent_schema"])
     serviceRecord.save(context)
 
     return web.json_response(serviceRecord.serialize())
