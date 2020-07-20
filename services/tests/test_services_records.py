@@ -42,6 +42,20 @@ class TestServiceRecord(AsyncTestCase):
         )
         record_id = await record.save(context)
 
-        await record.retrieve_by_id(context, record_id=record_id)
+        record = await ServiceRecord.retrieve_by_id(context, record_id=record_id)
         assert record.service_schema == self.service_schema
         assert record.consent_schema == self.consentSchema
+
+    async def testSaveAndQuery(self):
+        context = InjectionContext()
+        storage = BasicStorage()
+        context.injector.bind_instance(BaseStorage, storage)
+
+        record = ServiceRecord(
+            service_schema=self.service_schema, consent_schema=self.consentSchema
+        )
+        record_id = await record.save(context)
+
+        query = await ServiceRecord.query(context)
+        assert len(query) == 1
+

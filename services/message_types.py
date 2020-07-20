@@ -1,8 +1,10 @@
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
-PROTOCOL_PACKAGE = "services.verifiable_services"
+PROTOCOL_PACKAGE_DISCOVERY = "services.discovery"
 
-# REQUEST = f"{PROTOCOL_URI}/request"
+DISCOVERY = f"{PROTOCOL_URI}/discovery"
+DISCOVERY_RESPONSE = f"{PROTOCOL_URI}/discovery-response"
 
 MESSAGE_TYPES = {
-    # REQUEST: f"{PROTOCOL_PACKAGE}.Request",
+    DISCOVERY: f"{PROTOCOL_PACKAGE_DISCOVERY}.Discovery",
+    DISCOVERY_RESPONSE: f"{PROTOCOL_PACKAGE_DISCOVERY}.DiscoveryResponse",
 }
