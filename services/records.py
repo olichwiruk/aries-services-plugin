@@ -23,7 +23,6 @@ class ServiceSchema(Schema):
     oca_schema_namespace = fields.Str(required=True)
 
 
-# TODO: I think I need to add hash based storage
 class ServiceRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "verifiable_services"
@@ -33,22 +32,25 @@ class ServiceRecord(BaseRecord):
 
     def __init__(
         self,
+        label: str = None,
         *,
-        record_id: str = None,
         service_schema: str = None,
-        state: str = None,
         consent_schema: str = None,
+        state: str = None,
+        record_id: str = None,
         **keywordArgs,
     ):
         super().__init__(record_id, state, **keywordArgs)
         self.consent_schema = consent_schema
         self.service_schema = service_schema
+        self.label = label
 
     @property
     def record_value(self) -> dict:
         """Accessor to for the JSON record value properties"""
         return {
-            prop: getattr(self, prop) for prop in ("service_schema", "consent_schema")
+            prop: getattr(self, prop)
+            for prop in ("service_schema", "consent_schema", "label")
         }
 
     async def save(
@@ -106,6 +108,48 @@ class ServiceRecordSchema(BaseRecordSchema):
     class Meta:
         model_class = "ServiceRecord"
 
-    service_schema = fields.Nested("ServiceSchema")
-    consent_schema = fields.Nested("ConsentSchema")
+    label = fields.Str(required=True)
+    service_schema = fields.Nested(ServiceSchema())
+    consent_schema = fields.Nested(ConsentSchema())
 
+
+class ServiceDiscoveryRecord(BaseRecord):
+    RECORD_ID_NAME = "record_id"
+    RECORD_TYPE = "service_discovery"
+
+    class Meta:
+        schema_class = "ServiceDiscoveryRecordSchema"
+
+    def __init__(
+        self,
+        *,
+        services=None,
+        connection_id: str = None,
+        state: str = None,
+        record_id: str = None,
+        **keywordArgs,
+    ):
+        super().__init__(record_id, state, **keywordArgs)
+        self.services = services
+        self.connection_id = connection_id
+
+    @property
+    def record_value(self) -> dict:
+        """Accessor to for the JSON record value properties"""
+        return {prop: getattr(self, prop) for prop in ("services", "connection_id")}
+
+    @property
+    def record_tags(self) -> dict:
+        """Get tags for record, 
+            NOTE: relevent when filtering by tags"""
+        return {
+            "connection_id": self.connection_id,
+        }
+
+
+class ServiceDiscoveryRecordSchema(BaseRecordSchema):
+    class Meta:
+        model_class = "ServiceDiscoveryRecord"
+
+    services = fields.List(fields.Nested(ServiceRecordSchema()))
+    connection_id = fields.Str()

@@ -19,7 +19,13 @@ from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoun
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 # Internal
-from .records import ServiceRecord, ConsentSchema, ServiceSchema
+from .records import (
+    ServiceRecord,
+    ServiceRecordSchema,
+    ConsentSchema,
+    ServiceSchema,
+    ServiceDiscoveryRecord,
+)
 from .message_types import (
     PROTOCOL_PACKAGE_DISCOVERY as PROTOCOL_PACKAGE,
     DISCOVERY,
@@ -31,6 +37,7 @@ from .util import generate_model_schema
 from marshmallow import fields
 import hashlib
 import uuid
+import json
 
 
 Discovery, DiscoverySchema = generate_model_schema(
@@ -58,39 +65,31 @@ class DiscoveryResponseSchema(AgentMessageSchema):
     class Meta:
         model_class = DiscoveryResponse
 
-    protocols = fields.List(fields.Str(required=False), required=False,)
+    services = fields.List(fields.Nested(ServiceRecordSchema()), required=False,)
 
 
 class DiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        self._logger.debug(
-            "SERVICES DISCOVERY %s, ", context, responder,
-        )
+        self._logger.debug("SERVICES DISCOVERY %s, ", context)
         assert isinstance(context.message, Discovery)
 
         query = await ServiceRecord().query(context)
 
-        # create a list of serialized(in json format / dict format) records
-        query_serialized = [record.serialize() for record in query]
-
-        response = DiscoveryResponse(services=query_serialized)
+        response = DiscoveryResponse(services=query)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)
 
 
 class DiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
-        self._logger.debug(
-            "SERVICES DISCOVERY RESPONSE %s, ", context, responder,
-        )
+        self._logger.debug("SERVICES DISCOVERY RESPONSE %s, ", context)
         assert isinstance(context.message, DiscoveryResponse)
 
-        record = StorageRecord(
-            "ServiceDiscovery",
-            context.message.services,
-            tags={"connection_id": context.connection_record.connection_id},
+        record = ServiceDiscoveryRecord(
+            services=context.message.services,
+            connection_id=context.connection_record.connection_id,
         )
-        storage.add_record(record)
+
+        await record.save(context)

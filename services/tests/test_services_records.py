@@ -25,12 +25,17 @@ class TestServiceRecord(AsyncTestCase):
         "oca_schema_namespace": "test",
     }
 
+    label = "service"
+
     def testInit(self):
         record = ServiceRecord(
-            service_schema=self.service_schema, consent_schema=self.consentSchema
+            label=self.label,
+            service_schema=self.service_schema,
+            consent_schema=self.consentSchema,
         )
         assert self.service_schema == record.service_schema
         assert self.consentSchema == record.consent_schema
+        assert self.label == record.label
 
     async def testSaveAndRetrieve(self):
         context = InjectionContext()
@@ -38,13 +43,16 @@ class TestServiceRecord(AsyncTestCase):
         context.injector.bind_instance(BaseStorage, storage)
 
         record = ServiceRecord(
-            service_schema=self.service_schema, consent_schema=self.consentSchema
+            label=self.label,
+            service_schema=self.service_schema,
+            consent_schema=self.consentSchema,
         )
         record_id = await record.save(context)
 
         record = await ServiceRecord.retrieve_by_id(context, record_id=record_id)
         assert record.service_schema == self.service_schema
         assert record.consent_schema == self.consentSchema
+        assert record.label == self.label
 
     async def testSaveAndQuery(self):
         context = InjectionContext()
@@ -52,7 +60,9 @@ class TestServiceRecord(AsyncTestCase):
         context.injector.bind_instance(BaseStorage, storage)
 
         record = ServiceRecord(
-            service_schema=self.service_schema, consent_schema=self.consentSchema
+            label=self.label,
+            service_schema=self.service_schema,
+            consent_schema=self.consentSchema,
         )
         record_id = await record.save(context)
 

@@ -16,6 +16,7 @@ from .discovery import Discovery
 
 
 class AddSchema(Schema):
+    label = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
 
@@ -27,7 +28,9 @@ async def add(request: web.BaseRequest):
     params = await request.json()
 
     serviceRecord = ServiceRecord(
-        service_schema=params["service_schema"], consent_schema=params["consent_schema"]
+        label=params["label"],
+        service_schema=params["service_schema"],
+        consent_schema=params["consent_schema"],
     )
     hash_id = await serviceRecord.save(context)
 
@@ -52,7 +55,10 @@ async def getList(request: web.BaseRequest):
 
     if connection.is_ready:
         request = Discovery()
-        await outbound_handler(request, connection_id)
+        await outbound_handler(request, connection_id=connection_id)
+        return web.json_response(request.serialize())
+
+    return web.json_response("failed")
 
 
 @docs(
@@ -73,9 +79,10 @@ async def get(request: web.BaseRequest):
         return web.json_response(query_serialized)
 
     else:
-        record: StorageRecord = storage.search_records(
+        record = storage.search_records(
             "ServiceDiscovery", {"connection_id": connection_id}
-        ).fetch_single()
+        )
+        record = await record.fetch_single()
 
         return web.json_response(record.value)
 
@@ -84,7 +91,9 @@ async def register(app: web.Application):
     app.add_routes(
         [
             web.post("/verifiable-services/add", add),
-            web.get("/verifiable-services/{connection_id}", getList, allow_head=False),
+            web.get(
+                "/verifiable-services/send/{connection_id}", getList, allow_head=False
+            ),
             web.get("/verifiable-services/{connection_id}", get, allow_head=False),
         ]
     )
