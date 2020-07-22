@@ -72,3 +72,4 @@ class TestDiscovery(AsyncTestCase):
         handler = DiscoveryHandler()
         await handler.handle(context, responder)
         assert len(responder.messages) == 1
+        assert isinstance(responder.messages[0][0], DiscoveryResponse)

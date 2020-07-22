@@ -11,7 +11,7 @@ import logging
 import hashlib
 from typing import Sequence
 
-from .records import ServiceRecord, ConsentSchema, ServiceSchema
+from .records import ServiceRecord, ConsentSchema, ServiceSchema, ServiceDiscoveryRecord
 from .discovery import Discovery
 
 
@@ -32,16 +32,20 @@ async def add(request: web.BaseRequest):
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
     )
-    hash_id = await serviceRecord.save(context)
+
+    try:
+        hash_id = await serviceRecord.save(context)
+    except StorageDuplicateError:
+        pass
 
     return web.json_response(serviceRecord.serialize())
 
 
 @docs(
     tags=["verifiable-services"],
-    summary="Get the list of all currently registered services",
+    summary="Request a list of services from another agent",
 )
-async def getList(request: web.BaseRequest):
+async def requestServiceList(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
     outbound_handler = request.app["outbound_message_router"]
@@ -63,28 +67,25 @@ async def getList(request: web.BaseRequest):
 
 @docs(
     tags=["verifiable-services"],
-    summary="Get the list of all currently registered services",
+    summary="Get the saved list of services from another agent or from 'self'",
 )
-async def get(request: web.BaseRequest):
+async def getServiceList(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
-    storage: BaseStorage = await context.inject(BaseStorage)
 
+    query = None
     if connection_id == "self":
         query = await ServiceRecord().query(context)
-
-        # create a list of serialized(in json format / dict format) records
-        query_serialized = [record.serialize() for record in query]
-
-        return web.json_response(query_serialized)
-
     else:
-        record = storage.search_records(
-            "ServiceDiscovery", {"connection_id": connection_id}
-        )
-        record = await record.fetch_single()
+        try:
+            query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
+                context, connection_id
+            )
+            query = query.serialize()
+        except StorageNotFoundError:
+            return web.json_response("Services for this connection id, not found")
 
-        return web.json_response(record.value)
+    return web.json_response(query)
 
 
 async def register(app: web.Application):
@@ -92,8 +93,14 @@ async def register(app: web.Application):
         [
             web.post("/verifiable-services/add", add),
             web.get(
-                "/verifiable-services/send/{connection_id}", getList, allow_head=False
+                "/verifiable-services/request-list/{connection_id}",
+                requestServiceList,
+                allow_head=False,
             ),
-            web.get("/verifiable-services/{connection_id}", get, allow_head=False),
+            web.get(
+                "/verifiable-services/get-list/{connection_id}",
+                getServiceList,
+                allow_head=False,
+            ),
         ]
     )

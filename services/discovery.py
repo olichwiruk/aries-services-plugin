@@ -34,7 +34,7 @@ from .message_types import (
 from .util import generate_model_schema
 
 # External
-from marshmallow import fields
+from marshmallow import fields, Schema
 import hashlib
 import uuid
 import json
@@ -48,15 +48,21 @@ Discovery, DiscoverySchema = generate_model_schema(
 )
 
 
+class DiscoveryServicesSchema(Schema):
+    label = fields.Str(required=True)
+    service_schema = fields.Nested(ServiceSchema())
+    consent_schema = fields.Nested(ConsentSchema())
+
+
 class DiscoveryResponse(AgentMessage):
     class Meta:
         handler_class = f"{PROTOCOL_PACKAGE}.DiscoveryResponseHandler"
         message_type = DISCOVERY_RESPONSE
         schema_class = "DiscoveryResponseSchema"
 
-    def __init__(self, *, services: list = None, **kwargs):
+    def __init__(self, *, services: DiscoveryServicesSchema = None, **kwargs):
         super(DiscoveryResponse, self).__init__(**kwargs)
-        self.services = services if services else []
+        self.services = services
 
 
 class DiscoveryResponseSchema(AgentMessageSchema):
@@ -65,7 +71,7 @@ class DiscoveryResponseSchema(AgentMessageSchema):
     class Meta:
         model_class = DiscoveryResponse
 
-    services = fields.List(fields.Nested(ServiceRecordSchema()), required=False,)
+    services = fields.List(fields.Nested(DiscoveryServicesSchema()), required=True,)
 
 
 class DiscoveryHandler(BaseHandler):
@@ -87,9 +93,14 @@ class DiscoveryResponseHandler(BaseHandler):
         self._logger.debug("SERVICES DISCOVERY RESPONSE %s, ", context)
         assert isinstance(context.message, DiscoveryResponse)
 
-        record = ServiceDiscoveryRecord(
+        print(context.message.services)
+
+        record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
             services=context.message.services,
             connection_id=context.connection_record.connection_id,
         )
+        print(record)
+        if context.message.services != []:
+            assert record.services != []
 
         await record.save(context)
