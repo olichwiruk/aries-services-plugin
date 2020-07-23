@@ -24,7 +24,7 @@ import hashlib
 import uuid
 
 # Internal
-from .records import SchemaExchangeRecord
+from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
 from .util import *
 from .message_types import *
 
@@ -32,12 +32,13 @@ Request, RequestSchema = generate_model_schema(
     name="Request",
     handler=f"{PROTOCOL_PACKAGE}.RequestHandler",
     msg_type=REQUEST,
-    schema={"payload": fields.Str(required=True)},
+    schema={
+        "hash_id": fields.Str(required=True),
+        "exchange_id": fields.Str(required=True),
+    },
 )
 
-# Should this be named Receive ? Feels wrong to create a receive class when sending
-# something to someone and I dont want class for sending and receiveing so schema exchange for now
-# TODO: Figure out how to notify about saved record
+
 class RequestHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
@@ -49,19 +50,33 @@ class RequestHandler(BaseHandler):
         )
         assert isinstance(context.message, Request)
 
-        record = SchemaExchangeRecord(
-            payload=context.message.payload,
-            author=SchemaExchangeRecord.AUTHOR_OTHER,
-            state=SchemaExchangeRecord.STATE_PENDING,
+        state = SchemaExchangeRequestRecord.STATE_DENIED
+        try:
+            record = await SchemaExchangeRecord.retrieve_by_id(
+                context, context.message.hash_id
+            )
+            state = SchemaExchangeRequestRecord.STATE_APPROVED
+        except StorageNotFoundError:
+            response = Response(
+                state=state,
+                exchange_id=context.message.exchange_id,
+                payload="STORAGE NOT FOUND",
+            )
+            response.assign_thread_from(context.message)
+            await responder.send_reply(response)
+
+        request_record = SchemaExchangeRequestRecord(
+            payload=context.message.hash_id,
+            author=SchemaExchangeRequestRecord.AUTHOR_OTHER,
+            state=state,
             connection_id=context.connection_record.connection_id,
+            exchange_id=context.message.exchange_id,
         )
 
         try:
-            hashid = await record.save(
-                context, reason="Saved, Request from Other agent"
-            )
-        except StorageDuplicateError:
-            report = ProblemReport(explain_ltxt="Duplicate", who_retries="none")
+            await request_record.save(context, reason="Saved, Request from Other agent")
+        except StorageNotFoundError:
+            report = ProblemReport(explain_ltxt="StorageNotFound", who_retries="none")
             report.assign_thread_from(context.message)
             await responder.send_reply(report)
             return
@@ -69,12 +84,22 @@ class RequestHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": hashid,
+                "hash_id": context.message.hash_id,
                 "connection_id": context.connection_record.connection_id,
-                "payload": context.message.payload,
-                "state": "pending",
+                "state": state,
+                "exchange_id": context.message.exchange_id,
+                "payload": record.payload,
             },
         )
+
+        if state == SchemaExchangeRequestRecord.STATE_APPROVED:
+            response = Response(
+                state=state,
+                exchange_id=context.message.exchange_id,
+                payload=record.payload,
+            )
+            response.assign_thread_from(context.message)
+            await responder.send_reply(response)
 
 
 Response, ResponseSchema = generate_model_schema(
@@ -82,7 +107,8 @@ Response, ResponseSchema = generate_model_schema(
     handler=f"{PROTOCOL_PACKAGE}.ResponseHandler",
     msg_type=RESPONSE,
     schema={
-        "decision": fields.Str(required=True),
+        "state": fields.Str(required=True),
+        "exchange_id": fields.Str(required=True),
         "payload": fields.Str(required=False),
     },
 )
@@ -91,27 +117,39 @@ Response, ResponseSchema = generate_model_schema(
 class ResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
-        
-        decision = context.message.decision
-        payload = context.message.payload
-        connection_id = context.connection_record.connection_id
-        hashid = None
-
         self._logger.debug("SCHEMA_EXCHANGE_RESPONSE called with context %s", context)
         assert isinstance(context.message, Response)
 
-        # NOTE: Create and save accepted record to storage
-        if decision == SchemaExchangeRecord.STATE_ACCEPTED:
-            self._logger.debug("\nState: Accepted")
-            record = SchemaExchangeRecord(
-                payload=payload,
-                author=SchemaExchangeRecord.AUTHOR_OTHER,
-                state=decision,
-                connection_id=connection_id,
+        state = context.message.state
+        payload = context.message.payload
+        connection_id = context.connection_record.connection_id
+        exchange_id = context.message.exchange_id
+        hash_id = None
+
+        try:
+            request_record: SchemaExchangeRequestRecord = await SchemaExchangeRequestRecord.retrieve_by_exchange_id(
+                context, exchange_id
+            )
+        except StorageNotFoundError:
+            report = ProblemReport(
+                explain_ltxt="RequestRecordNotFound", who_retries="none"
+            )
+            report.assign_thread_from(context.message)
+            await responder.send_reply(report)
+            return
+
+        request_record.state = state
+        await request_record.save(context)
+
+        if state == SchemaExchangeRequestRecord.STATE_APPROVED:
+
+            # NOTE: Save the schema record to storage
+            record: SchemaExchangeRecord = SchemaExchangeRecord(
+                payload=payload, author=connection_id,
             )
 
             try:
-                hashid = await record.save(
+                hash_id = await record.save(
                     context, reason="Saved, SchemaExchange from Other agent"
                 )
             except StorageDuplicateError:
@@ -123,9 +161,9 @@ class ResponseHandler(BaseHandler):
         await responder.send_webhook(
             "schema_exchange",
             {
-                "hashid": hashid,
+                "hash_id": hash_id,
                 "connection_id": connection_id,
                 "payload": payload,
-                "state": decision,
+                "state": state,
             },
         )

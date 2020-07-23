@@ -183,7 +183,7 @@ def connectAgents(connectionAgent1, connectionAgent2):
     )
     receiveInvitation = sendMessage(message, connectionAgent2)
     
-    return receiveInvitation
+    return [createInvitation, receiveInvitation]
 
 ## after agents connect
 

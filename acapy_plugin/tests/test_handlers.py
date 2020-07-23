@@ -15,51 +15,78 @@ from ..schema_exchange import *
 
 class TestSchemaExchangeResponse(AsyncTestCase):
     payload = "{Test Payload}"
-    hashid = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
     author = "other"
     connection_id = "1234"
+    state = "pending"
+
+    content = payload + author + connection_id + state
+    request_hash = hashlib.sha256(content.encode("UTF-8")).hexdigest()
+    hash_id = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
 
     async def testHandlerAccept(self):
-        decision = SchemaExchangeRecord.STATE_ACCEPTED
         context = RequestContext()
-        context.connection_ready = True
         storage = BasicStorage()
         responder = MockResponder()
+
         context.injector.bind_instance(BaseStorage, storage)
+        state = SchemaExchangeRequestRecord.STATE_APPROVED
+
+        context.connection_ready = True
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
-        context.message = Response(decision=decision, payload=self.payload)
-        assert context.message.decision == decision
-        assert context.message.payload == self.payload
+
+        record = SchemaExchangeRequestRecord(
+            payload=self.payload,
+            author=self.author,
+            connection_id=self.connection_id,
+            state=self.state,
+        )
+
+        await record.save(context)
+        context.message = Response(
+            state=state, payload=self.payload, exchange_id=record.exchange_id,
+        )
 
         handler = ResponseHandler()
         await handler.handle(context, responder)
 
-        record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
-        record.connection_id == self.connection_id
-        record.author = self.author
-        record.payload = self.payload
         assert len(responder.messages) == 0
         assert len(responder.webhooks) == 1
         assert responder.webhooks[0] == (
             "schema_exchange",
             {
-                "hashid": self.hashid,
+                "hash_id": self.hash_id,
                 "connection_id": self.connection_id,
                 "payload": self.payload,
-                "state": decision,
+                "state": state,
             },
         )
+        record = await SchemaExchangeRecord.retrieve_by_id(context, self.hash_id)
 
     async def testHandlerReject(self):
-        decision = SchemaExchangeRecord.STATE_REJECTED
         context = RequestContext()
-        context.connection_ready = True
         storage = BasicStorage()
         responder = MockResponder()
+
+        state = SchemaExchangeRequestRecord.STATE_DENIED
         context.injector.bind_instance(BaseStorage, storage)
+
+        context.connection_ready = True
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
-        context.message = Response(decision=decision, payload=self.payload)
-        assert context.message.decision == decision
+
+        record = SchemaExchangeRequestRecord(
+            payload=self.payload,
+            author=self.author,
+            connection_id=self.connection_id,
+            state=self.state,
+        )
+
+        await record.save(context)
+        record_id = record.exchange_id
+
+        context.message = Response(
+            state=state, payload=self.payload, exchange_id=record.exchange_id,
+        )
+        assert context.message.state == state
         assert context.message.payload == self.payload
 
         handler = ResponseHandler()
@@ -67,7 +94,7 @@ class TestSchemaExchangeResponse(AsyncTestCase):
 
         record = None
         try:
-            record = await SchemaExchangeRecord.retrieve_by_id(context, self.hashid)
+            record = await SchemaExchangeRecord.retrieve_by_id(context, self.hash_id)
         except:
             pass
         finally:
@@ -77,10 +104,10 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         assert responder.webhooks[0] == (
             "schema_exchange",
             {
-                "hashid": None,
+                "hash_id": None,
                 "connection_id": self.connection_id,
                 "payload": self.payload,
-                "state": decision,
+                "state": state,
             },
         )
 
