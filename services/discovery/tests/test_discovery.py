@@ -12,6 +12,8 @@ import json
 
 from ..discovery import *
 
+from ...discovery.message_types import *
+
 
 class TestDiscovery(AsyncTestCase):
     connection_id = "1234"

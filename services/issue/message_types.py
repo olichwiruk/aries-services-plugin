@@ -1,8 +1,14 @@
-from ..message_types import PROTOCOL_URI
+PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
 
 PROTOCOL_PACKAGE = "services.issue.issue_credential_consentual"
 APPLICATION = f"{PROTOCOL_URI}/application"
 MESSAGE_TYPES = {APPLICATION: f"{PROTOCOL_PACKAGE}.Application"}
+
+# Messages
+from ..util import generate_model_schema
+from marshmallow import Schema, fields
+from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
+from ..discovery.records import ConsentSchema, ServiceSchema
 
 Application, ApplicationSchema = generate_model_schema(
     name="Application",

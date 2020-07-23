@@ -30,7 +30,7 @@ class AddSchema(Schema):
 
 @request_schema(AddSchema())
 @docs(tags=["verifiable-services"], summary="Add a verifiable service")
-async def add(request: web.BaseRequest):
+async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
@@ -52,7 +52,7 @@ async def add(request: web.BaseRequest):
     tags=["verifiable-services"],
     summary="Request a list of services from another agent",
 )
-async def requestServiceList(request: web.BaseRequest):
+async def request_services_list(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
     outbound_handler = request.app["outbound_message_router"]
@@ -76,7 +76,7 @@ async def requestServiceList(request: web.BaseRequest):
     tags=["verifiable-services"],
     summary="Get the saved list of services from another agent",
 )
-async def getServiceList(request: web.BaseRequest):
+async def get_service_list(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
 
@@ -90,40 +90,40 @@ async def getServiceList(request: web.BaseRequest):
     return web.json_response(query.serialize())
 
 
-async def apply(request: web.BaseRequest):
-    context = request.app["request_context"]
-    params = await request.json()
-    outbound_handler = request.app["outbound_message_router"]
+# async def apply(request: web.BaseRequest):
+#     context = request.app["request_context"]
+#     params = await request.json()
+#     outbound_handler = request.app["outbound_message_router"]
 
-    try:
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+#     try:
+#         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
+#             context, connection_id
+#         )
+#     except StorageNotFoundError:
+#         raise web.HTTPNotFound
 
-    # TODO:
-    if connection.is_ready:
-        request = Application()
-        await outbound_handler(request, connection_id=connection_id)
-        return web.json_response(request.serialize())
+#     # TODO:
+#     if connection.is_ready:
+#         request = Application()
+#         await outbound_handler(request, connection_id=connection_id)
+#         return web.json_response(request.serialize())
 
-    return web.json_response("connection not ready")
+#     return web.json_response("connection not ready")
 
 
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.post("/verifiable-services/add", add),
-            web.post("/verifiable-services/apply", apply),
+            web.post("/verifiable-services/add-services", add_service),
+            # web.post("/verifiable-services/apply", apply),
             web.get(
                 "/verifiable-services/request-list/{connection_id}",
-                requestServiceList,
+                request_services_list,
                 allow_head=False,
             ),
             web.get(
                 "/verifiable-services/get-list/{connection_id}",
-                getServiceList,
+                get_service_list,
                 allow_head=False,
             ),
         ]

@@ -26,6 +26,7 @@ from .records import (
     ServiceSchema,
     ServiceDiscoveryRecord,
 )
+from .message_types import *
 from ..util import generate_model_schema
 
 # External

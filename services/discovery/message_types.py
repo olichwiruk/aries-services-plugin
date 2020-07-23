@@ -1,4 +1,4 @@
-from ..message_types import PROTOCOL_URI
+PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
 
 PROTOCOL_PACKAGE = "services.discovery.discovery"
 
@@ -11,6 +11,10 @@ MESSAGE_TYPES = {
 }
 
 # Messages
+from ..util import generate_model_schema
+from marshmallow import Schema, fields
+from .records import ServiceSchema, ConsentSchema
+from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 
 Discovery, DiscoverySchema = generate_model_schema(
     name="Discovery",
