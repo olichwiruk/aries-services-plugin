@@ -19,13 +19,13 @@ class SendRequestSchema(Schema):
     connection_id = fields.Str(required=True)
 
 
-class AddSchema(Schema):
+class AddSchemaRecordSchema(Schema):
     payload = fields.Str(required=True)
 
 
 @docs(tags=["Schema Exchange"], summary="Request a schema by schema id")
 @request_schema(SendRequestSchema())
-async def requestSchemaRecord(request: web.BaseRequest):
+async def request_schema_record(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
@@ -68,8 +68,8 @@ async def requestSchemaRecord(request: web.BaseRequest):
 
 
 @docs(tags=["Schema Storage"], summary="Add schema to storage")
-@request_schema(AddSchema())
-async def addSchemaRecord(request: web.BaseRequest):
+@request_schema(AddSchemaRecordSchema())
+async def add_schema_record(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
     params = await request.json()
@@ -86,7 +86,7 @@ async def addSchemaRecord(request: web.BaseRequest):
 
 
 @docs(tags=["Schema Storage"], summary="Retrieve a schema record by it's hash_id")
-async def getSchemaRecord(request: web.BaseRequest):
+async def get_schema_record(request: web.BaseRequest):
     context = request.app["request_context"]
     hash_id = request.match_info["hash_id"]
 
@@ -101,7 +101,7 @@ async def getSchemaRecord(request: web.BaseRequest):
 
 
 @docs(tags=["Schema Storage"], summary="Retrieve a list of schema records from storage")
-async def getSchemaRecordList(request: web.BaseRequest):
+async def get_schema_record_list(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
 
@@ -138,10 +138,10 @@ async def DEBUGGetSchemaRequestList(request: web.BaseRequest):
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.post("/schema-exchange/request-schema", requestSchemaRecord),
-            web.post("/schema-storage/add", addSchemaRecord),
-            web.post("/schema-storage/list", getSchemaRecordList),
+            web.post("/schema-exchange/request-schema", request_schema_record),
+            web.post("/schema-storage/add", add_schema_record),
+            web.post("/schema-storage/list", get_schema_record_list),
             web.post("/schema-storage/debug/request/list", DEBUGGetSchemaRequestList),
-            web.get("/schema-storage/{hash_id}", getSchemaRecord, allow_head=False),
+            web.get("/schema-storage/{hash_id}", get_schema_record, allow_head=False),
         ]
     )

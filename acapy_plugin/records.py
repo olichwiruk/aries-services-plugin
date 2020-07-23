@@ -138,7 +138,7 @@ class SchemaExchangeRequestRecord(BaseRecord):
 
     @property
     def record_value(self) -> dict:
-        """Accessor to for the JSON record value properties"""
+        """Accessor to the JSON record value properties"""
         return {
             prop: getattr(self, prop)
             for prop in ("payload", "connection_id", "state", "author", "exchange_id",)

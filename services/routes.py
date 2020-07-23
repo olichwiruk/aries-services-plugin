@@ -22,13 +22,13 @@ from .discovery.message_types import Discovery
 from .issue.message_types import Application
 
 
-class AddSchema(Schema):
+class AddServiceSchema(Schema):
     label = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
 
 
-@request_schema(AddSchema())
+@request_schema(AddServiceSchema())
 @docs(tags=["verifiable-services"], summary="Add a verifiable service")
 async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
@@ -90,32 +90,32 @@ async def get_service_list(request: web.BaseRequest):
     return web.json_response(query.serialize())
 
 
-# async def apply(request: web.BaseRequest):
-#     context = request.app["request_context"]
-#     params = await request.json()
-#     outbound_handler = request.app["outbound_message_router"]
+async def apply(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = await request.json()
+    outbound_handler = request.app["outbound_message_router"]
 
-#     try:
-#         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-#             context, connection_id
-#         )
-#     except StorageNotFoundError:
-#         raise web.HTTPNotFound
+    try:
+        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
+            context, connection_id
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
 
-#     # TODO:
-#     if connection.is_ready:
-#         request = Application()
-#         await outbound_handler(request, connection_id=connection_id)
-#         return web.json_response(request.serialize())
+    # TODO:
+    if connection.is_ready:
+        request = Application()
+        await outbound_handler(request, connection_id=connection_id)
+        return web.json_response(request.serialize())
 
-#     return web.json_response("connection not ready")
+    return web.json_response("connection not ready")
 
 
 async def register(app: web.Application):
     app.add_routes(
         [
             web.post("/verifiable-services/add-services", add_service),
-            # web.post("/verifiable-services/apply", apply),
+            web.post("/verifiable-services/apply", apply),
             web.get(
                 "/verifiable-services/request-list/{connection_id}",
                 request_services_list,
