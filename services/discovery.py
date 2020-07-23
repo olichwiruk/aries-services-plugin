@@ -48,7 +48,7 @@ Discovery, DiscoverySchema = generate_model_schema(
 )
 
 
-class DiscoveryServicesSchema(Schema):
+class DiscoveryServiceSchema(Schema):
     label = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
@@ -60,7 +60,7 @@ class DiscoveryResponse(AgentMessage):
         message_type = DISCOVERY_RESPONSE
         schema_class = "DiscoveryResponseSchema"
 
-    def __init__(self, *, services: DiscoveryServicesSchema = None, **kwargs):
+    def __init__(self, *, services: DiscoveryServiceSchema = None, **kwargs):
         super(DiscoveryResponse, self).__init__(**kwargs)
         self.services = services
 
@@ -71,7 +71,7 @@ class DiscoveryResponseSchema(AgentMessageSchema):
     class Meta:
         model_class = DiscoveryResponse
 
-    services = fields.List(fields.Nested(DiscoveryServicesSchema()), required=True,)
+    services = fields.List(fields.Nested(DiscoveryServiceSchema()), required=True,)
 
 
 class DiscoveryHandler(BaseHandler):
@@ -93,14 +93,23 @@ class DiscoveryResponseHandler(BaseHandler):
         self._logger.debug("SERVICES DISCOVERY RESPONSE %s, ", context)
         assert isinstance(context.message, DiscoveryResponse)
 
+        connection_id = context.connection_record.connection_id
         print(context.message.services)
 
-        record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
-            services=context.message.services,
-            connection_id=context.connection_record.connection_id,
-        )
-        print(record)
-        if context.message.services != []:
-            assert record.services != []
+        try:
+            record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
+                services=context.message.services, connection_id=connection_id,
+            )
 
-        await record.save(context)
+            print(record)
+            if context.message.services != []:
+                assert record.services != []
+
+            await record.save(context)
+        except StorageDuplicateError:
+            record = await ServiceDiscoveryRecord.retrieve_by_connection_id(
+                context, connection_id
+            )
+            record.services = context.message.services
+            await record.save(context)
+

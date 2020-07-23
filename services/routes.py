@@ -13,6 +13,7 @@ from typing import Sequence
 
 from .records import ServiceRecord, ConsentSchema, ServiceSchema, ServiceDiscoveryRecord
 from .discovery import Discovery
+from .issue_credential_consentual import Application
 
 
 class AddSchema(Schema):
@@ -67,31 +68,48 @@ async def requestServiceList(request: web.BaseRequest):
 
 @docs(
     tags=["verifiable-services"],
-    summary="Get the saved list of services from another agent or from 'self'",
+    summary="Get the saved list of services from another agent",
 )
 async def getServiceList(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
 
-    query = None
-    if connection_id == "self":
-        query = await ServiceRecord().query(context)
-    else:
-        try:
-            query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
-                context, connection_id
-            )
-            query = query.serialize()
-        except StorageNotFoundError:
-            return web.json_response("Services for this connection id, not found")
+    try:
+        query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
+            context, connection_id
+        )
+    except StorageNotFoundError:
+        return web.json_response("Services for this connection id not found")
 
-    return web.json_response(query)
+    return web.json_response(query.serialize())
+
+
+async def apply(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = await request.json()
+    outbound_handler = request.app["outbound_message_router"]
+
+    try:
+        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
+            context, connection_id
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    # TODO:
+    if connection.is_ready:
+        request = Application()
+        await outbound_handler(request, connection_id=connection_id)
+        return web.json_response(request.serialize())
+
+    return web.json_response("failed")
 
 
 async def register(app: web.Application):
     app.add_routes(
         [
             web.post("/verifiable-services/add", add),
+            web.post("/verifiable-services/apply", apply),
             web.get(
                 "/verifiable-services/request-list/{connection_id}",
                 requestServiceList,
