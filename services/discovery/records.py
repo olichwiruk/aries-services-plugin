@@ -202,10 +202,3 @@ class ServiceDiscoveryRecord(BaseRecord):
 
         return self._id
 
-
-class ServiceDiscoveryRecordSchema(BaseRecordSchema):
-    class Meta:
-        model_class = "ServiceDiscoveryRecord"
-
-    services = fields.List(fields.Nested(ServiceRecordSchema()))
-    connection_id = fields.Str()

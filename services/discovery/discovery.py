@@ -26,52 +26,13 @@ from .records import (
     ServiceSchema,
     ServiceDiscoveryRecord,
 )
-from .message_types import (
-    PROTOCOL_PACKAGE_DISCOVERY as PROTOCOL_PACKAGE,
-    DISCOVERY,
-    DISCOVERY_RESPONSE,
-)
-from .util import generate_model_schema
+from ..util import generate_model_schema
 
 # External
 from marshmallow import fields, Schema
 import hashlib
 import uuid
 import json
-
-
-Discovery, DiscoverySchema = generate_model_schema(
-    name="Discovery",
-    handler=f"{PROTOCOL_PACKAGE}.DiscoveryHandler",
-    msg_type=DISCOVERY,
-    schema={},
-)
-
-
-class DiscoveryServiceSchema(Schema):
-    label = fields.Str(required=True)
-    service_schema = fields.Nested(ServiceSchema())
-    consent_schema = fields.Nested(ConsentSchema())
-
-
-class DiscoveryResponse(AgentMessage):
-    class Meta:
-        handler_class = f"{PROTOCOL_PACKAGE}.DiscoveryResponseHandler"
-        message_type = DISCOVERY_RESPONSE
-        schema_class = "DiscoveryResponseSchema"
-
-    def __init__(self, *, services: DiscoveryServiceSchema = None, **kwargs):
-        super(DiscoveryResponse, self).__init__(**kwargs)
-        self.services = services
-
-
-class DiscoveryResponseSchema(AgentMessageSchema):
-    """DiscoveryResponse message schema used in serialization/deserialization."""
-
-    class Meta:
-        model_class = DiscoveryResponse
-
-    services = fields.List(fields.Nested(DiscoveryServiceSchema()), required=True,)
 
 
 class DiscoveryHandler(BaseHandler):

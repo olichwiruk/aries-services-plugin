@@ -19,36 +19,13 @@ from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoun
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 # Internal
-from .records import (
-    ServiceRecord,
-    ServiceRecordSchema,
-    ConsentSchema,
-    ServiceSchema,
-    ServiceDiscoveryRecord,
-)
-from .message_types import PROTOCOL_URI
-from .util import generate_model_schema
+from ..util import generate_model_schema
 
 # External
 from marshmallow import fields, Schema
 import hashlib
 import uuid
 import json
-
-PROTOCOL_PACKAGE = "services.issue_credential_consentual"
-APPLICATION = f"{PROTOCOL_URI}/application"
-MESSAGE_TYPES = {APPLICATION: f"{PROTOCOL_PACKAGE}.Application"}
-
-Application, ApplicationSchema = generate_model_schema(
-    name="Application",
-    handler=f"{PROTOCOL_PACKAGE}.ApplicationHandler",
-    msg_type=APPLICATION,
-    schema={
-        "label": fields.Str(required=True),
-        "service_schema": fields.Nested(ServiceSchema()),
-        "consent_schema": fields.Nested(ConsentSchema()),
-    },
-)
 
 
 class ApplicationHandler(BaseHandler):
@@ -57,3 +34,4 @@ class ApplicationHandler(BaseHandler):
 
         print(context.message)
         assert isinstance(context.message, Application)
+

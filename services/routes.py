@@ -11,9 +11,15 @@ import logging
 import hashlib
 from typing import Sequence
 
-from .records import ServiceRecord, ConsentSchema, ServiceSchema, ServiceDiscoveryRecord
-from .discovery import Discovery
-from .issue_credential_consentual import Application
+# Internal
+from .discovery.records import (
+    ServiceRecord,
+    ConsentSchema,
+    ServiceSchema,
+    ServiceDiscoveryRecord,
+)
+from .discovery.message_types import Discovery
+from .issue.message_types import Application
 
 
 class AddSchema(Schema):
@@ -102,7 +108,7 @@ async def apply(request: web.BaseRequest):
         await outbound_handler(request, connection_id=connection_id)
         return web.json_response(request.serialize())
 
-    return web.json_response("failed")
+    return web.json_response("connection not ready")
 
 
 async def register(app: web.Application):
