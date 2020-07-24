@@ -30,6 +30,7 @@ async def apply(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
     outbound_handler = request.app["outbound_message_router"]
+    print(params)
 
     try:
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
@@ -40,10 +41,10 @@ async def apply(request: web.BaseRequest):
 
     if connection.is_ready:
         request = Application(
-            service_schema=context.message.service_schema,
-            consent_schema=context.message.consent_schema,
+            service_schema=params["service_schema"],
+            consent_schema=params["consent_schema"],
         )
         await outbound_handler(request, connection_id=params["connection_id"])
-        return web.json_response(request.serialize())
+        return web.json_response("success")
 
     return web.json_response("connection not ready")
