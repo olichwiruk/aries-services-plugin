@@ -20,6 +20,7 @@ from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 # Internal
 from ..util import generate_model_schema
+from .message_types import *
 
 # External
 from marshmallow import fields, Schema

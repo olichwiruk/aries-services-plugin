@@ -21,6 +21,8 @@ from .discovery.models import (
 from .discovery.message_types import Discovery
 from .issue.message_types import Application
 
+from .issue.routes import *
+
 
 class AddServiceSchema(Schema):
     label = fields.Str(required=True)
@@ -29,7 +31,7 @@ class AddServiceSchema(Schema):
 
 
 @request_schema(AddServiceSchema())
-@docs(tags=["verifiable-services"], summary="Add a verifiable service")
+@docs(tags=["Verifiable Services"], summary="Add a verifiable service")
 async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
@@ -49,8 +51,7 @@ async def add_service(request: web.BaseRequest):
 
 
 @docs(
-    tags=["verifiable-services"],
-    summary="Request a list of services from another agent",
+    tags=["Service Discovery"], summary="Request a list of services from another agent",
 )
 async def request_services_list(request: web.BaseRequest):
     context = request.app["request_context"]
@@ -73,7 +74,7 @@ async def request_services_list(request: web.BaseRequest):
 
 
 @docs(
-    tags=["verifiable-services"],
+    tags=["Service Discovery"],
     summary="Get the saved list of services from another agent",
 )
 async def get_service_list(request: web.BaseRequest):
@@ -88,35 +89,6 @@ async def get_service_list(request: web.BaseRequest):
         return web.json_response("Services for this connection id not found")
 
     return web.json_response(query.serialize())
-
-
-class ApplySchema(Schema):
-    service_schema = fields.Nested(ServiceSchema())
-    consent_schema = fields.Nested(ConsentSchema())
-    connection_id = fields.Str()
-
-
-async def apply(request: web.BaseRequest):
-    context = request.app["request_context"]
-    params = await request.json()
-    outbound_handler = request.app["outbound_message_router"]
-
-    try:
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, params["connection_id"]
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    if connection.is_ready:
-        request = Application(
-            service_schema=context.message.service_schema,
-            consent_schema=context.message.consent_schema,
-        )
-        await outbound_handler(request, connection_id=params["connection_id"])
-        return web.json_response(request.serialize())
-
-    return web.json_response("connection not ready")
 
 
 async def register(app: web.Application):

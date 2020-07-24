@@ -12,6 +12,7 @@ import hashlib
 from typing import Sequence
 
 from .message_types import Application
+from ..discovery.models import ConsentSchema, ServiceSchema
 
 
 class ApplySchema(Schema):
@@ -20,6 +21,11 @@ class ApplySchema(Schema):
     connection_id = fields.Str()
 
 
+@docs(
+    tags=["Verifiable Services"],
+    summary="Get the saved list of services from another agent",
+)
+@request_schema(ApplySchema())
 async def apply(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
