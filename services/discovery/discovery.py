@@ -19,7 +19,7 @@ from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoun
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 # Internal
-from .records import (
+from .models import (
     ServiceRecord,
     ServiceRecordSchema,
     ConsentSchema,

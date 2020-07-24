@@ -11,7 +11,7 @@ import hashlib
 from typing import Sequence
 
 import acapy_plugin.schema_exchange as schema_exchange
-from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
+from .models import SchemaExchangeRecord, SchemaExchangeRequestRecord
 
 
 class SendRequestSchema(Schema):
@@ -100,7 +100,7 @@ async def get_schema_record(request: web.BaseRequest):
     return web.json_response(record.serialize())
 
 
-@docs(tags=["Schema Storage"], summary="Retrieve a list of schema records from storage")
+@docs(tags=["Schema Storage"], summary="Retrieve a list of schema models from storage")
 async def get_schema_record_list(request: web.BaseRequest):
     context = request.app["request_context"]
     logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ async def get_schema_record_list(request: web.BaseRequest):
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    # create a list of serialized(in json format / dict format) records
+    # create a list of serialized(in json format / dict format) models
     query_list = [i.serialize() for i in query]
 
     return web.json_response(query_list)
@@ -129,7 +129,7 @@ async def DEBUGGetSchemaRequestList(request: web.BaseRequest):
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    # create a list of serialized(in json format / dict format) records
+    # create a list of serialized(in json format / dict format) models
     query_list = [i.serialize() for i in query]
 
     return web.json_response(query_list)

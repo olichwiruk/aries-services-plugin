@@ -24,7 +24,7 @@ import hashlib
 import uuid
 
 # Internal
-from .records import SchemaExchangeRecord, SchemaExchangeRequestRecord
+from .models import SchemaExchangeRecord, SchemaExchangeRequestRecord
 from .util import *
 from .message_types import *
 

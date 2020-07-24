@@ -4,7 +4,7 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.storage.error import StorageDuplicateError
 from aries_cloudagent.messaging.util import datetime_to_str, time_now
 
-from ..discovery.records import ConsentSchema, ServiceSchema
+from ..discovery.models import ConsentSchema, ServiceSchema
 import hashlib
 from marshmallow import fields, Schema
 from typing import Mapping, Any
@@ -33,8 +33,8 @@ class ServiceIssueRecord(BaseRecord):
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
         connection_id: str = None,
-        exchange_id: str = None,
         state: str = None,
+        exchange_id: str = None,
         record_id: str = None,
         **keywordArgs,
     ):
@@ -42,7 +42,32 @@ class ServiceIssueRecord(BaseRecord):
         self.service = service
         self.consent = consent
         self.connection_id = connection_id
-        self.exchange_id = exchange_id
+        self.exchange_id = uuid.uuid4() if exchange_id is None else exchange_id
+
+    @property
+    def record_value(self) -> dict:
+        """Accessor to for the JSON record value properties"""
+        return {
+            prop: getattr(self, prop)
+            for prop in (
+                "service_schema",
+                "consent_schema",
+                "connection_id",
+                "state",
+                "exchange_id",
+                "record_id",
+            )
+        }
+
+    @property
+    def record_tags(self) -> dict:
+        """Get tags for record, 
+            NOTE: relevent when filtering by tags"""
+        return {
+            "connection_id": self.connection_id,
+            "exchange_id": self.exchange_id,
+            "state": self.state,
+        }
 
 
 class ServiceIssueRecordSchema(BaseRecordSchema):

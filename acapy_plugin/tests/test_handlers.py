@@ -9,7 +9,7 @@ from marshmallow import fields
 from unittest import mock, TestCase
 import json
 
-from ..records import SchemaExchangeRecord, SchemaExchangeRecordSchema
+from ..models import SchemaExchangeRecord, SchemaExchangeRecordSchema
 from ..schema_exchange import *
 
 

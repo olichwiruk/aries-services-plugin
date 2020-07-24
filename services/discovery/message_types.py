@@ -13,7 +13,7 @@ MESSAGE_TYPES = {
 # Messages
 from ..util import generate_model_schema
 from marshmallow import Schema, fields
-from .records import ServiceSchema, ConsentSchema
+from .models import ServiceSchema, ConsentSchema
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 
 Discovery, DiscoverySchema = generate_model_schema(

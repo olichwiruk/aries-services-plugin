@@ -12,7 +12,7 @@ import hashlib
 from typing import Sequence
 
 # Internal
-from .discovery.records import (
+from .discovery.models import (
     ServiceRecord,
     ConsentSchema,
     ServiceSchema,
@@ -90,6 +90,12 @@ async def get_service_list(request: web.BaseRequest):
     return web.json_response(query.serialize())
 
 
+class ApplySchema(Schema):
+    service_schema = fields.Nested(ServiceSchema())
+    consent_schema = fields.Nested(ConsentSchema())
+    connection_id = fields.Str()
+
+
 async def apply(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
@@ -97,15 +103,17 @@ async def apply(request: web.BaseRequest):
 
     try:
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
+            context, params["connection_id"]
         )
     except StorageNotFoundError:
         raise web.HTTPNotFound
 
-    # TODO:
     if connection.is_ready:
-        request = Application()
-        await outbound_handler(request, connection_id=connection_id)
+        request = Application(
+            service_schema=context.message.service_schema,
+            consent_schema=context.message.consent_schema,
+        )
+        await outbound_handler(request, connection_id=params["connection_id"])
         return web.json_response(request.serialize())
 
     return web.json_response("connection not ready")
@@ -114,7 +122,7 @@ async def apply(request: web.BaseRequest):
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.post("/verifiable-services/add-services", add_service),
+            web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
                 "/verifiable-services/request-list/{connection_id}",

@@ -9,7 +9,7 @@ from marshmallow import fields
 from unittest import mock, TestCase
 import json
 
-from ..records import *
+from ..models import *
 
 
 class TestSchemaExchangeRecord(AsyncTestCase):
