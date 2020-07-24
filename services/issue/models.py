@@ -30,17 +30,17 @@ class ServiceIssueRecord(BaseRecord):
     def __init__(
         self,
         *,
+        state: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
         connection_id: str = None,
-        state: str = None,
         exchange_id: str = None,
         record_id: str = None,
         **keywordArgs,
     ):
         super().__init__(record_id, state, **keywordArgs)
-        self.service = service
-        self.consent = consent
+        self.service_schema = service_schema
+        self.consent_schema = consent_schema
         self.connection_id = connection_id
         self.exchange_id = uuid.uuid4() if exchange_id is None else exchange_id
 
@@ -55,7 +55,6 @@ class ServiceIssueRecord(BaseRecord):
                 "connection_id",
                 "state",
                 "exchange_id",
-                "record_id",
             )
         }
 
@@ -71,6 +70,9 @@ class ServiceIssueRecord(BaseRecord):
 
 
 class ServiceIssueRecordSchema(BaseRecordSchema):
+    class Meta:
+        model_class = "ServiceIssueRecord"
+
     state = fields.Str(required=True)
     connection_id = fields.Str(required=True)
     exchange_id = fields.Str(required=True)
