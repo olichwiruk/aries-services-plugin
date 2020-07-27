@@ -16,10 +16,6 @@ class ServiceIssueRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "service_issue"
 
-    APPLICATION_PENDING = "pending application"
-    APPLICATION_CONSENT_ACCEPTED = "consent application accepted"
-    APPLICATION_CONSENT_REJECTED = "consent application rejected"
-
     ISSUE_PENDING = "pending issue"
     ISSUE_REJECTED = "rejected issue"
     ISSUE_ACCEPTED = "accepted issue"

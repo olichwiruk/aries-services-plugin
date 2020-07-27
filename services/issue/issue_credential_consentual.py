@@ -57,14 +57,14 @@ class ApplicationHandler(BaseHandler):
             connection_id=context.connection_record.connection_id,
         )
 
-        await send_confirmation(record, responder, context)
+        await send_confirmation(context, responder, record)
 
         # TODO: Some kind of decision mechanism
 
         record.state = ServiceIssueRecord.ISSUE_ACCEPTED
-        record.save(context)
+        await record.save(context)
 
-        await send_confirmation(record, responder, context)
+        await send_confirmation(context, responder, record)
 
 
 class ConfirmationHandler(BaseHandler):
@@ -75,7 +75,7 @@ class ConfirmationHandler(BaseHandler):
         assert isinstance(context.message, Confirmation)
 
         try:
-            record = ServiceIssueRecord.retrieve_by_exchange_id(
+            record = await ServiceIssueRecord.retrieve_by_exchange_id(
                 context, context.message.exchange_id
             )
         except StorageNotFoundError:

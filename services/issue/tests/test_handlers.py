@@ -10,10 +10,13 @@ from unittest import mock, TestCase
 import datetime
 import json
 
+# Internal
 from ..models import *
+from ..message_types import *
+from ..issue_credential_consentual import *
 
 
-class TestServiceRecord(AsyncTestCase):
+class TestIssueHandlers(AsyncTestCase):
     consent_schema = {
         "oca_schema_dri": "1234",
         "oca_schema_namespace": "test",
@@ -25,14 +28,11 @@ class TestServiceRecord(AsyncTestCase):
     }
     connection_id = "1234"
     exchange_id = "1234"
-    state = ServiceIssueRecord.ISSUE_PENDING
 
-    def assert_self_record(self, record):
+    def assert_confirmation_record(self, record, state):
         assert self.service_schema == record.service_schema
-        assert self.consent_schema == record.consent_schema
-        assert self.connection_id == record.connection_id
-        assert self.exchange_id == record.exchange_id
-        assert self.state == record.state
+        assert self.service_schema == record.service_schema
+        assert state == record.state
 
     def create_record(self):
         record = ServiceIssueRecord(
@@ -48,29 +48,27 @@ class TestServiceRecord(AsyncTestCase):
     def create_default_context(self):
         context = InjectionContext()
         storage = BasicStorage()
+        responder = MockResponder()
+
         context.injector.bind_instance(BaseStorage, storage)
 
-        return [context, storage]
+        context.connection_ready = True
+        context.connection_record = ConnectionRecord(connection_id=self.connection_id)
 
-    def test_init(self):
-        record = self.create_record()
-        self.assert_self_record(record)
+        return [context, storage, responder]
 
     async def test_save_retrieve(self):
-        context, storage = self.create_default_context()
+        context, storage, responder = self.create_default_context()
 
-        record = self.create_record()
-        record_id = await record.save(context)
+        context.message = Application(
+            consent_schema=self.consent_schema, service_schema=self.service_schema
+        )
 
-        record = await ServiceIssueRecord.retrieve_by_id(context, record_id=record_id)
-        self.assert_self_record(record)
+        handler = ApplicationHandler()
+        await handler.handle(context, responder)
+        assert len(responder.messages) == 2
+        result, message = responder.messages[0]
 
-    async def testSaveAndQuery(self):
-        context, storage = self.create_default_context()
-        record = self.create_record()
-        record_id = await record.save(context)
-
-        query = await ServiceIssueRecord.query(context)
-        assert len(query) == 1
-        self.assert_self_record(query[0])
+        assert isinstance(result, Confirmation)
+        self.assert_confirmation_record(result, ServiceIssueRecord.ISSUE_PENDING)
 

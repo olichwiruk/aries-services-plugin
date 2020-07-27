@@ -23,16 +23,22 @@ class TestSchemaExchangeResponse(AsyncTestCase):
     request_hash = hashlib.sha256(content.encode("UTF-8")).hexdigest()
     hash_id = hashlib.sha256(payload.encode("UTF-8")).hexdigest()
 
-    async def testHandlerAccept(self):
+    async def create_default_context(self):
         context = RequestContext()
         storage = BasicStorage()
         responder = MockResponder()
 
         context.injector.bind_instance(BaseStorage, storage)
-        state = SchemaExchangeRequestRecord.STATE_APPROVED
 
         context.connection_ready = True
         context.connection_record = ConnectionRecord(connection_id=self.connection_id)
+
+        return [context, storage, responder]
+
+    async def testHandlerAccept(self):
+        context, storage, responder = await self.create_default_context()
+
+        state = SchemaExchangeRequestRecord.STATE_APPROVED
 
         record = SchemaExchangeRequestRecord(
             payload=self.payload,
@@ -63,15 +69,9 @@ class TestSchemaExchangeResponse(AsyncTestCase):
         record = await SchemaExchangeRecord.retrieve_by_id(context, self.hash_id)
 
     async def testHandlerReject(self):
-        context = RequestContext()
-        storage = BasicStorage()
-        responder = MockResponder()
+        context, storage, responder = await self.create_default_context()
 
         state = SchemaExchangeRequestRecord.STATE_DENIED
-        context.injector.bind_instance(BaseStorage, storage)
-
-        context.connection_ready = True
-        context.connection_record = ConnectionRecord(connection_id=self.connection_id)
 
         record = SchemaExchangeRequestRecord(
             payload=self.payload,
