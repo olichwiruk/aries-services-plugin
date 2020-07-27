@@ -30,7 +30,7 @@ import uuid
 import json
 
 
-async def send_confirmation(context, responder, record):
+async def send_confirmation(context, responder, record: ServiceIssueRecord):
     confirmation = Confirmation(
         exchange_id=record.exchange_id,
         service_schema=record.service_schema,
@@ -56,6 +56,7 @@ class ApplicationHandler(BaseHandler):
             service_schema=context.message.service_schema,
             consent_schema=context.message.consent_schema,
             connection_id=context.connection_record.connection_id,
+            exchange_id=context.message.exchange_id,
         )
 
         await send_confirmation(context, responder, record)
@@ -80,14 +81,8 @@ class ConfirmationHandler(BaseHandler):
                 context, context.message.exchange_id
             )
         except StorageNotFoundError:
-            record = ServiceIssueRecord(
-                state=context.message.state,
-                author=ServiceIssueRecord.AUTHOR_SELF,
-                service_schema=context.message.service_schema,
-                consent_schema=context.message.consent_schema,
-                connection_id=context.connection_record.connection_id,
-                exchange_id=context.message.exchange_id,
-            )
+            print("\n\nConfirmation Error\n\n")
+            return
 
         record.state = context.message.state
 

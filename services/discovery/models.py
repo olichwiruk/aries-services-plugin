@@ -10,6 +10,8 @@ from typing import Mapping, Any
 import uuid
 import json
 
+from ..util import assert_items_are_not_none
+
 
 class ConsentSchema(Schema):
     # dri - decentralized resource identifier

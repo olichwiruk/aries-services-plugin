@@ -10,7 +10,7 @@ from asynctest import mock as async_mock
 from aiohttp import web as aio_web
 import hashlib
 
-from ..schema_exchange import Request
+from ..handlers import Request
 
 
 class TestRequestRoutes(AsyncTestCase):

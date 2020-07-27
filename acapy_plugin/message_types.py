@@ -1,5 +1,5 @@
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/schema-exchange/1.0"
-PROTOCOL_PACKAGE = "acapy_plugin.schema_exchange"
+PROTOCOL_PACKAGE = "acapy_plugin.handlers"
 
 REQUEST = f"{PROTOCOL_URI}/request"
 RESPONSE = f"{PROTOCOL_URI}/response"

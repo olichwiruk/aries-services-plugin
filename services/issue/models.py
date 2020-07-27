@@ -18,6 +18,7 @@ class ServiceIssueRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "service_issue"
 
+    ISSUE_WAITING_FOR_RESPONSE = "waiting for response"
     ISSUE_PENDING = "pending issue"
     ISSUE_REJECTED = "rejected issue"
     ISSUE_ACCEPTED = "accepted issue"
@@ -47,6 +48,7 @@ class ServiceIssueRecord(BaseRecord):
         self.author = author
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
 
+        # this will error on empty query
         assert_items_are_not_none(
             self.service_schema,
             self.consent_schema,
@@ -54,6 +56,9 @@ class ServiceIssueRecord(BaseRecord):
             self.author,
             self.exchange_id,
         )
+
+        # Check if exchange id is equal to exchange id that was passed in
+        assert self.exchange_id == exchange_id if exchange_id is not None else True
 
     @property
     def record_value(self) -> dict:

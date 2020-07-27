@@ -13,7 +13,7 @@ import json
 # Internal
 from ..models import *
 from ..message_types import *
-from ..issue_credential_consentual import *
+from ..handlers import *
 
 
 class TestIssueHandlers(AsyncTestCase):
@@ -77,3 +77,4 @@ class TestIssueHandlers(AsyncTestCase):
 
         handler = ConfirmationHandler()
         await handler.handle(context, responder)
+

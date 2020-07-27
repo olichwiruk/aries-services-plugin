@@ -68,7 +68,7 @@ class TestServiceRecord(AsyncTestCase):
         record = await ServiceIssueRecord.retrieve_by_id(context, record_id=record_id)
         self.assert_self_record(record)
 
-    async def testSaveAndQuery(self):
+    async def test_save_and_query(self):
         context, storage = self.create_default_context()
         record = self.create_record()
         record_id = await record.save(context)

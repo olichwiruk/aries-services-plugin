@@ -5,7 +5,7 @@ from ..discovery.models import ConsentSchema, ServiceSchema
 
 # Message Types
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
-PROTOCOL_PACKAGE = "services.issue.issue_credential_consentual"
+PROTOCOL_PACKAGE = "services.issue.handlers"
 
 
 APPLICATION = f"{PROTOCOL_URI}/application"
@@ -25,6 +25,7 @@ Application, ApplicationSchema = generate_model_schema(
     schema={
         "service_schema": fields.Nested(ServiceSchema()),
         "consent_schema": fields.Nested(ConsentSchema()),
+        "exchange_id": fields.Str(required=True),
     },
 )
 

@@ -65,7 +65,9 @@ class TestDiscovery(AsyncTestCase):
         context.injector.bind_instance(BaseStorage, storage)
 
         record = ServiceRecord(
-            consent_schema=self.consentSchema, service_schema=self.service_schema
+            consent_schema=self.consentSchema,
+            service_schema=self.service_schema,
+            label=self.label,
         )
         await record.save(context=context)
 

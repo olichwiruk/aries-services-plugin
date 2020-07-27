@@ -10,7 +10,7 @@ import logging
 import hashlib
 from typing import Sequence
 
-import acapy_plugin.schema_exchange as schema_exchange
+import acapy_plugin.handlers as handlers
 from .models import SchemaExchangeRecord, SchemaExchangeRequestRecord
 
 
@@ -46,7 +46,7 @@ async def request_schema_record(request: web.BaseRequest):
     )
 
     if connection.is_ready:
-        message = schema_exchange.Request(
+        message = handlers.Request(
             hash_id=params["hash_id"], exchange_id=record.exchange_id,
         )
         await outbound_handler(message, connection_id=connection.connection_id)

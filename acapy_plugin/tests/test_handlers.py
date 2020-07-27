@@ -10,7 +10,7 @@ from unittest import mock, TestCase
 import json
 
 from ..models import SchemaExchangeRecord, SchemaExchangeRecordSchema
-from ..schema_exchange import *
+from ..handlers import *
 
 
 class TestSchemaExchangeResponse(AsyncTestCase):
