@@ -42,7 +42,7 @@ class ServiceIssueRecord(BaseRecord):
         self.service_schema = service_schema
         self.consent_schema = consent_schema
         self.connection_id = connection_id
-        self.exchange_id = uuid.uuid4() if exchange_id is None else exchange_id
+        self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
 
     @property
     def record_value(self) -> dict:
@@ -67,6 +67,10 @@ class ServiceIssueRecord(BaseRecord):
             "exchange_id": self.exchange_id,
             "state": self.state,
         }
+
+    @classmethod
+    async def retrieve_by_exchange_id(cls, context: InjectionContext, exchange_id: str):
+        return await cls.retrieve_by_tag_filter(context, {"exchange_id": exchange_id},)
 
 
 class ServiceIssueRecordSchema(BaseRecordSchema):

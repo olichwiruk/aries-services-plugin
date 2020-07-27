@@ -19,10 +19,13 @@ class TestSchemaExchangeRecord(AsyncTestCase):
     state = "pending"
     connection_id = "1234"
 
-    def testInit(self):
-        record = SchemaExchangeRecord(payload=self.payload, author=self.author,)
+    def assert_record(self, record):
         assert self.payload == record.payload
         assert self.author == record.author
+
+    def testInit(self):
+        record = SchemaExchangeRecord(payload=self.payload, author=self.author,)
+        self.assert_record(record)
 
     async def testSaveAndRetrieve(self):
         context = InjectionContext()
@@ -32,10 +35,10 @@ class TestSchemaExchangeRecord(AsyncTestCase):
         record = SchemaExchangeRecord(payload=self.payload, author=self.author,)
         record_id = await record.save(context)
         assert record_id == self.hash_id
-        assert record.payload == self.payload
-        assert record.author == self.author
+        self.assert_record(record)
 
         query = await SchemaExchangeRecord.retrieve_by_id(context, self.hash_id)
+        self.assert_record(query)
         assert query == record
 
 

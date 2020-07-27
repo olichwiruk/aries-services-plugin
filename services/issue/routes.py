@@ -30,7 +30,6 @@ async def apply(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
     outbound_handler = request.app["outbound_message_router"]
-    print(params)
 
     try:
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(

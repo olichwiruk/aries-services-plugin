@@ -3,6 +3,9 @@ from aiohttp import web
 from .issue.routes import *
 from .discovery.routes import *
 
+# NOTE: define functions in sub routes files (i.e issue.routes) and register
+# them here
+
 
 async def register(app: web.Application):
     app.add_routes(
