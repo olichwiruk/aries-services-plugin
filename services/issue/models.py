@@ -4,12 +4,14 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.storage.error import StorageDuplicateError
 from aries_cloudagent.messaging.util import datetime_to_str, time_now
 
-from ..discovery.models import ConsentSchema, ServiceSchema
 import hashlib
 from marshmallow import fields, Schema
 from typing import Mapping, Any
 import uuid
 import json
+
+from ..discovery.models import ConsentSchema, ServiceSchema
+from ..util import assert_items_are_not_none
 
 
 class ServiceIssueRecord(BaseRecord):
@@ -20,6 +22,9 @@ class ServiceIssueRecord(BaseRecord):
     ISSUE_REJECTED = "rejected issue"
     ISSUE_ACCEPTED = "accepted issue"
 
+    AUTHOR_SELF = "self"
+    AUTHOR_OTHER = "other"
+
     class Meta:
         schema_class = "ServiceIssueRecordSchema"
 
@@ -27,6 +32,7 @@ class ServiceIssueRecord(BaseRecord):
         self,
         *,
         state: str = None,
+        author: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
         connection_id: str = None,
@@ -38,7 +44,16 @@ class ServiceIssueRecord(BaseRecord):
         self.service_schema = service_schema
         self.consent_schema = consent_schema
         self.connection_id = connection_id
+        self.author = author
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
+
+        assert_items_are_not_none(
+            self.service_schema,
+            self.consent_schema,
+            self.connection_id,
+            self.author,
+            self.exchange_id,
+        )
 
     @property
     def record_value(self) -> dict:
@@ -50,6 +65,7 @@ class ServiceIssueRecord(BaseRecord):
                 "consent_schema",
                 "connection_id",
                 "state",
+                "author",
                 "exchange_id",
             )
         }
@@ -62,6 +78,7 @@ class ServiceIssueRecord(BaseRecord):
             "connection_id": self.connection_id,
             "exchange_id": self.exchange_id,
             "state": self.state,
+            "author": self.author,
         }
 
     @classmethod
@@ -73,8 +90,9 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     class Meta:
         model_class = "ServiceIssueRecord"
 
-    state = fields.Str(required=True)
-    connection_id = fields.Str(required=True)
-    exchange_id = fields.Str(required=True)
+    state = fields.Str(required=False)
+    author = fields.Str(required=False)
+    connection_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())

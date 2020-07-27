@@ -28,22 +28,13 @@ class TestIssueHandlers(AsyncTestCase):
     }
     connection_id = "1234"
     exchange_id = "1234"
+    state = ServiceIssueRecord.ISSUE_PENDING
 
     def assert_confirmation_record(self, record, state):
+        assert isinstance(record, Confirmation)
         assert self.service_schema == record.service_schema
         assert self.service_schema == record.service_schema
         assert state == record.state
-
-    def create_record(self):
-        record = ServiceIssueRecord(
-            state=self.state,
-            service_schema=self.service_schema,
-            consent_schema=self.consent_schema,
-            connection_id=self.connection_id,
-            exchange_id=self.exchange_id,
-        )
-
-        return record
 
     def create_default_context(self):
         context = InjectionContext()
@@ -57,7 +48,7 @@ class TestIssueHandlers(AsyncTestCase):
 
         return [context, storage, responder]
 
-    async def test_save_retrieve(self):
+    async def test_application_handler(self):
         context, storage, responder = self.create_default_context()
 
         context.message = Application(
@@ -66,9 +57,23 @@ class TestIssueHandlers(AsyncTestCase):
 
         handler = ApplicationHandler()
         await handler.handle(context, responder)
-        assert len(responder.messages) == 2
-        result, message = responder.messages[0]
 
-        assert isinstance(result, Confirmation)
+        assert len(responder.messages) == 2
+
+        result, message = responder.messages[0]
         self.assert_confirmation_record(result, ServiceIssueRecord.ISSUE_PENDING)
 
+        result, message = responder.messages[1]
+        self.assert_confirmation_record(result, ServiceIssueRecord.ISSUE_ACCEPTED)
+
+    async def test_confirmation_handler(self):
+        context, storage, responder = self.create_default_context()
+        context.message = Confirmation(
+            exchange_id=self.exchange_id,
+            service_schema=self.service_schema,
+            consent_schema=self.consent_schema,
+            state=self.state,
+        )
+
+        handler = ConfirmationHandler()
+        await handler.handle(context, responder)

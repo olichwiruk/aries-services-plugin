@@ -14,6 +14,15 @@ from aries_cloudagent.messaging.base_handler import (
 # from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 
+def assert_items_are_not_none(*arguments):
+    """
+    Iterate through all the parameters that were passed to this function and assert that
+    they are not None
+    """
+    for item in arguments:
+        assert item is not None
+
+
 def generic_init(instance, **kwargs):
     """Initialize from kwargs into slots."""
     for slot in instance.__slots__:

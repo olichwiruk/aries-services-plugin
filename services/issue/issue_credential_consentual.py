@@ -52,6 +52,7 @@ class ApplicationHandler(BaseHandler):
 
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
+            author=ServiceIssueRecord.AUTHOR_OTHER,
             service_schema=context.message.service_schema,
             consent_schema=context.message.consent_schema,
             connection_id=context.connection_record.connection_id,
@@ -81,6 +82,7 @@ class ConfirmationHandler(BaseHandler):
         except StorageNotFoundError:
             record = ServiceIssueRecord(
                 state=context.message.state,
+                author=ServiceIssueRecord.AUTHOR_SELF,
                 service_schema=context.message.service_schema,
                 consent_schema=context.message.consent_schema,
                 connection_id=context.connection_record.connection_id,
