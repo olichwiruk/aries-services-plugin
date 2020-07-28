@@ -77,8 +77,10 @@ class ConfirmationHandler(BaseHandler):
         assert isinstance(context.message, Confirmation)
 
         try:
-            record = await ServiceIssueRecord.retrieve_by_exchange_id(
-                context, context.message.exchange_id
+            record = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
             )
         except StorageNotFoundError:
             print("\n\nConfirmation Error\n\n")

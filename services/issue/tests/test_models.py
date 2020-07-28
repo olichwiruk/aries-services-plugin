@@ -25,6 +25,7 @@ class TestServiceRecord(AsyncTestCase):
     }
     connection_id = "1234"
     exchange_id = "1234"
+
     state = ServiceIssueRecord.ISSUE_PENDING
     author = ServiceIssueRecord.AUTHOR_SELF
 

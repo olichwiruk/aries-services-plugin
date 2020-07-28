@@ -76,8 +76,10 @@ class TestIssueHandlers(AsyncTestCase):
         result, message = responder.messages[1]
         self.assert_confirmation_record(result, ServiceIssueRecord.ISSUE_ACCEPTED)
 
-        query = await ServiceIssueRecord().retrieve_by_exchange_id(
-            context, self.exchange_id
+        query = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+            context,
+            context.message.exchange_id,
+            context.connection_record.connection_id,
         )
         assert query.service_schema == self.service_schema
 
@@ -103,8 +105,10 @@ class TestIssueHandlers(AsyncTestCase):
         handler = ConfirmationHandler()
         await handler.handle(context, responder)
 
-        query = await ServiceIssueRecord().retrieve_by_exchange_id(
-            context, self.exchange_id
+        query = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+            context,
+            context.message.exchange_id,
+            context.connection_record.connection_id,
         )
         self.assert_issue_records_are_the_same(query, record)
 

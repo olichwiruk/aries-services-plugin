@@ -52,7 +52,7 @@ async def apply(request: web.BaseRequest):
 
         request = Application(
             service_schema=record.service_schema,
-            consent_schema=record_consent_schema,
+            consent_schema=record.consent_schema,
             exchange_id=record.exchange_id,
         )
         await outbound_handler(request, connection_id=params["connection_id"])
