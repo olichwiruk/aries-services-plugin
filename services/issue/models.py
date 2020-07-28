@@ -48,18 +48,6 @@ class ServiceIssueRecord(BaseRecord):
         self.author = author
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
 
-        # this will error on empty query
-        assert_items_are_not_none(
-            self.service_schema,
-            self.consent_schema,
-            self.connection_id,
-            self.author,
-            self.exchange_id,
-        )
-
-        # Check if exchange id is equal to exchange id that was passed in
-        assert self.exchange_id == exchange_id if exchange_id is not None else True
-
     @property
     def record_value(self) -> dict:
         """Accessor to for the JSON record value properties"""

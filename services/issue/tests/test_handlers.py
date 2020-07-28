@@ -33,8 +33,16 @@ class TestIssueHandlers(AsyncTestCase):
     def assert_confirmation_record(self, record, state):
         assert isinstance(record, Confirmation)
         assert self.service_schema == record.service_schema
-        assert self.service_schema == record.service_schema
+        assert self.consent_schema == record.consent_schema
         assert state == record.state
+
+    def assert_issue_records_are_the_same(self, record1, record2):
+        assert record1.service_schema == record2.service_schema
+        assert record1.consent_schema == record2.consent_schema
+        assert record1.state == record2.state
+        assert record1.author == record2.author
+        assert record1.exchange_id == record2.exchange_id
+        assert record1.connection_id == record2.connection_id
 
     def create_default_context(self):
         context = InjectionContext()
@@ -52,7 +60,9 @@ class TestIssueHandlers(AsyncTestCase):
         context, storage, responder = self.create_default_context()
 
         context.message = Application(
-            consent_schema=self.consent_schema, service_schema=self.service_schema
+            consent_schema=self.consent_schema,
+            service_schema=self.service_schema,
+            exchange_id=self.exchange_id,
         )
 
         handler = ApplicationHandler()
@@ -66,8 +76,23 @@ class TestIssueHandlers(AsyncTestCase):
         result, message = responder.messages[1]
         self.assert_confirmation_record(result, ServiceIssueRecord.ISSUE_ACCEPTED)
 
+        query = await ServiceIssueRecord().retrieve_by_exchange_id(
+            context, self.exchange_id
+        )
+        assert query.service_schema == self.service_schema
+
     async def test_confirmation_handler(self):
         context, storage, responder = self.create_default_context()
+        record = ServiceIssueRecord(
+            state=ServiceIssueRecord.ISSUE_PENDING,
+            author=ServiceIssueRecord.AUTHOR_OTHER,
+            service_schema=self.service_schema,
+            consent_schema=self.consent_schema,
+            connection_id=self.connection_id,
+            exchange_id=self.exchange_id,
+        )
+        await record.save(context)
+
         context.message = Confirmation(
             exchange_id=self.exchange_id,
             service_schema=self.service_schema,
@@ -77,4 +102,9 @@ class TestIssueHandlers(AsyncTestCase):
 
         handler = ConfirmationHandler()
         await handler.handle(context, responder)
+
+        query = await ServiceIssueRecord().retrieve_by_exchange_id(
+            context, self.exchange_id
+        )
+        self.assert_issue_records_are_the_same(query, record)
 

@@ -51,8 +51,8 @@ async def apply(request: web.BaseRequest):
         await record.save(context)
 
         request = Application(
-            service_schema=params["service_schema"],
-            consent_schema=params["consent_schema"],
+            service_schema=record.service_schema,
+            consent_schema=record_consent_schema,
             exchange_id=record.exchange_id,
         )
         await outbound_handler(request, connection_id=params["connection_id"])
