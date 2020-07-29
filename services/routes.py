@@ -22,5 +22,10 @@ async def register(app: web.Application):
                 get_service_list,
                 allow_head=False,
             ),
+            web.get(
+                "/verifiable-services/get-list/self",
+                get_service_list_self,
+                allow_head=False,
+            ),
         ]
     )

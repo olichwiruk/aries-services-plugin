@@ -33,18 +33,18 @@ async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
-    serviceRecord = ServiceRecord(
+    service_record = ServiceRecord(
         label=params["label"],
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
     )
 
     try:
-        hash_id = await serviceRecord.save(context)
+        hash_id = await service_record.save(context)
     except StorageDuplicateError:
         pass
 
-    return web.json_response(serviceRecord.serialize())
+    return web.json_response(service_record.serialize())
 
 
 @docs(
@@ -91,13 +91,14 @@ async def get_service_list(request: web.BaseRequest):
 @docs(
     tags=["Service Discovery"], summary="Get a list of all services I registered",
 )
-async def get_service_list(request: web.BaseRequest):
+async def get_service_list_self(request: web.BaseRequest):
     context = request.app["request_context"]
-    connection_id = request.match_info["connection_id"]
 
     try:
-        query: ServiceRecord = await ServiceRecord().query(context)
+        query = await ServiceRecord().query(context)
     except StorageNotFoundError:
         return web.json_response("Services not found")
 
-    return web.json_response(query.serialize())
+    query = [i.serialize() for i in query]
+
+    return web.json_response(query)

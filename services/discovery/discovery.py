@@ -48,10 +48,14 @@ class DiscoveryHandler(BaseHandler):
         records = []
         for service in query:
             record = DiscoveryServiceSchema()
-            record.service_schema = service.service_schema
-            record.consent_schema = service.service_schema
-            record.label = service.label
-            record.service_id = service._id
+            record = record.dump(
+                {
+                    "service_schema": service.service_schema,
+                    "consent_schema": service.consent_schema,
+                    "service_id": service._id,
+                    "label": service.label,
+                }
+            )
             records.append(record)
 
         response = DiscoveryResponse(services=records)
@@ -65,13 +69,12 @@ class DiscoveryResponseHandler(BaseHandler):
         assert isinstance(context.message, DiscoveryResponse)
 
         connection_id = context.connection_record.connection_id
-        print(context.message.services)
 
         try:
             record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
                 services=context.message.services, connection_id=connection_id,
             )
-
+            print("\n\nRECORD SAVE\n\n")
             print(record)
             if context.message.services != []:
                 assert record.services != []
@@ -81,6 +84,8 @@ class DiscoveryResponseHandler(BaseHandler):
             record = await ServiceDiscoveryRecord.retrieve_by_connection_id(
                 context, connection_id
             )
+            print("\n\RECORD RETRIEVE CONNENCTION _ID\n\n")
+            print(record)
             record.services = context.message.services
             await record.save(context)
 
