@@ -78,4 +78,4 @@ class TestDiscovery(AsyncTestCase):
         await handler.handle(context, responder)
         assert len(responder.messages) == 1
         assert isinstance(responder.messages[0][0], DiscoveryResponse)
-        assert service_id == responder.messages[0][0].services[0].service_id
+        assert service_id == responder.messages[0][0].services[0]["service_id"]
