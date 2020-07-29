@@ -29,6 +29,7 @@ class TestIssueHandlers(AsyncTestCase):
     connection_id = "1234"
     exchange_id = "1234"
     state = ServiceIssueRecord.ISSUE_PENDING
+    label = "aaaa"
 
     def assert_confirmation_record(self, record, state):
         assert isinstance(record, Confirmation)
@@ -56,8 +57,16 @@ class TestIssueHandlers(AsyncTestCase):
 
     async def test_application_handler(self):
         context, storage, responder = self.create_default_context()
+        record = ServiceRecord(
+            label=self.label,
+            consent_schema=self.consent_schema,
+            service_schema=self.service_schema,
+        )
+        service_id = await record.save(context)
 
-        context.message = Application(exchange_id=self.exchange_id,)
+        context.message = Application(
+            exchange_id=self.exchange_id, service_id=service_id
+        )
 
         handler = ApplicationHandler()
         await handler.handle(context, responder)

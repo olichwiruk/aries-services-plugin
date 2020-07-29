@@ -22,6 +22,7 @@ from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 from ..util import generate_model_schema
 from .message_types import *
 from .models import ServiceIssueRecord
+from ..discovery.models import ServiceRecord
 
 # External
 from marshmallow import fields, Schema
@@ -37,6 +38,13 @@ async def send_confirmation(context, responder, record: ServiceIssueRecord):
     await responder.send_reply(confirmation)
 
 
+async def send_confirmation_long(context, responder, exchange_id, state):
+    confirmation = Confirmation(exchange_id=exchange_id, state=state,)
+
+    confirmation.assign_thread_from(context.message)
+    await responder.send_reply(confirmation)
+
+
 class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
@@ -45,11 +53,24 @@ class ApplicationHandler(BaseHandler):
         print(context.message)
         assert isinstance(context.message, Application)
 
+        try:
+            service: ServiceRecord = await ServiceRecord().retrieve_by_id(
+                context, context.message.service_id
+            )
+        except StorageNotFoundError:
+            send_confirmation_long(
+                context,
+                responder,
+                context.message.exchange_id,
+                ServiceIssueRecord.ISSUE_SERVICE_NOT_FOUND,
+            )
+            return
+
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
-            service_schema=context.message.service_schema,
-            consent_schema=context.message.consent_schema,
+            service_schema=service.service_schema,
+            consent_schema=service.consent_schema,
             connection_id=context.connection_record.connection_id,
             exchange_id=context.message.exchange_id,
         )
