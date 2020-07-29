@@ -32,6 +32,7 @@ import json
 
 
 async def send_confirmation(context, responder, record: ServiceIssueRecord):
+    print("send_confirmation")
     confirmation = Confirmation(exchange_id=record.exchange_id, state=record.state,)
 
     confirmation.assign_thread_from(context.message)
@@ -39,6 +40,7 @@ async def send_confirmation(context, responder, record: ServiceIssueRecord):
 
 
 async def send_confirmation_long(context, responder, exchange_id, state):
+    print("send_confirmation_long")
     confirmation = Confirmation(exchange_id=exchange_id, state=state,)
 
     confirmation.assign_thread_from(context.message)
@@ -66,6 +68,8 @@ class ApplicationHandler(BaseHandler):
             )
             return
 
+        print("before record")
+
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
@@ -73,6 +77,8 @@ class ApplicationHandler(BaseHandler):
             consent_schema=service.consent_schema,
             connection_id=context.connection_record.connection_id,
             exchange_id=context.message.exchange_id,
+            service_id=context.message.service_id,
+            label=service.label,
         )
 
         await send_confirmation(context, responder, record)
@@ -80,7 +86,9 @@ class ApplicationHandler(BaseHandler):
         # TODO: Some kind of decision mechanism
 
         record.state = ServiceIssueRecord.ISSUE_ACCEPTED
+        print("before save %s", record)
         await record.save(context)
+        print("after save %s", record)
 
         await send_confirmation(context, responder, record)
 

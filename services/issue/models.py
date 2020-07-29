@@ -36,6 +36,7 @@ class ServiceIssueRecord(BaseRecord):
         state: str = None,
         author: str = None,
         service_id: str = None,
+        label: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
         connection_id: str = None,
@@ -49,6 +50,7 @@ class ServiceIssueRecord(BaseRecord):
         self.consent_schema = consent_schema
         self.connection_id = connection_id
         self.author = author
+        self.label = label
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
 
     @property
@@ -64,6 +66,7 @@ class ServiceIssueRecord(BaseRecord):
                 "author",
                 "exchange_id",
                 "service_id",
+                "label",
             )
         }
 
@@ -81,6 +84,7 @@ class ServiceIssueRecord(BaseRecord):
             "exchange_id": self.exchange_id,
             "state": self.state,
             "author": self.author,
+            "label": self.label,
         }
 
     @classmethod
@@ -154,5 +158,7 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     author = fields.Str(required=False)
     connection_id = fields.Str(required=False)
     exchange_id = fields.Str(required=False)
+    label = fields.Str(required=False)
+    service_id = fields.Str(required=False)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())

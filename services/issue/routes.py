@@ -17,13 +17,13 @@ from .models import ServiceIssueRecord
 
 
 class ApplySchema(Schema):
-    service_id = fields.Str()
-    connection_id = fields.Str()
+    service_id = fields.Str(required=True)
+    connection_id = fields.Str(required=True)
 
 
 @docs(
     tags=["Verifiable Services"],
-    summary="Get the saved list of services from another agent",
+    summary="Apply to a service that connected agent provides, you need a service_id that you can get from service discovery request list",
 )
 @request_schema(ApplySchema())
 async def apply(request: web.BaseRequest):
@@ -41,7 +41,7 @@ async def apply(request: web.BaseRequest):
         # query for a service with exact service_id
         service = None
         for query in services.services:
-            if query.service_id == params["service_id"]:
+            if query["service_id"] == params["service_id"]:
                 service = query
                 break
         if service == None:
@@ -54,10 +54,10 @@ async def apply(request: web.BaseRequest):
             connection_id=params["connection_id"],
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
             author=ServiceIssueRecord.AUTHOR_SELF,
-            service_schema=service.service_schema,
-            consent_schema=service.consent_schema,
-            service_id=service.service_id,
-            label=service.label,
+            service_schema=service["service_schema"],
+            consent_schema=service["consent_schema"],
+            service_id=service["service_id"],
+            label=service["label"],
         )
 
         await record.save(context)
