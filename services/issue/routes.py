@@ -12,13 +12,12 @@ import hashlib
 from typing import Sequence
 
 from .message_types import Application
-from ..discovery.models import ConsentSchema, ServiceSchema
+from ..discovery.models import ConsentSchema, ServiceSchema, ServiceDiscoveryRecord
 from .models import ServiceIssueRecord
 
 
 class ApplySchema(Schema):
-    service_schema = fields.Nested(ServiceSchema())
-    consent_schema = fields.Nested(ConsentSchema())
+    service_id = fields.Str()
     connection_id = fields.Str()
 
 
@@ -36,25 +35,35 @@ async def apply(request: web.BaseRequest):
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, params["connection_id"]
         )
+        services: ServiceDiscoveryRecord = await ServiceDiscoveryRecord.retrieve_by_connection_id(
+            context, params["connection_id"]
+        )
+        # query for a service with exact service_id
+        service = None
+        for query in services.services:
+            if query.service_id == params["service_id"]:
+                service = query
+                break
+        if service == None:
+            raise StorageNotFoundError
     except StorageNotFoundError:
         raise web.HTTPNotFound
 
     if connection.is_ready:
         record = ServiceIssueRecord(
+            connection_id=params["connection_id"],
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
             author=ServiceIssueRecord.AUTHOR_SELF,
-            service_schema=params["service_schema"],
-            consent_schema=params["consent_schema"],
-            connection_id=params["connection_id"],
-            label=params["label"],
+            service_schema=service.service_schema,
+            consent_schema=service.consent_schema,
+            service_id=service.service_id,
+            label=service.label,
         )
 
         await record.save(context)
 
         request = Application(
-            service_schema=record.service_schema,
-            consent_schema=record.consent_schema,
-            exchange_id=record.exchange_id,
+            service_id=record.service_id, exchange_id=record.exchange_id,
         )
         await outbound_handler(request, connection_id=params["connection_id"])
         return web.json_response("success")

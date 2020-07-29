@@ -34,6 +34,7 @@ class ServiceIssueRecord(BaseRecord):
         *,
         state: str = None,
         author: str = None,
+        service_id: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
         connection_id: str = None,
@@ -42,6 +43,7 @@ class ServiceIssueRecord(BaseRecord):
         **keywordArgs,
     ):
         super().__init__(record_id, state, **keywordArgs)
+        self.service_id = service_id
         self.service_schema = service_schema
         self.consent_schema = consent_schema
         self.connection_id = connection_id
@@ -60,6 +62,7 @@ class ServiceIssueRecord(BaseRecord):
                 "state",
                 "author",
                 "exchange_id",
+                "service_id",
             )
         }
 

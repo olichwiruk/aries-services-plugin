@@ -23,7 +23,7 @@ Application, ApplicationSchema = generate_model_schema(
     handler=f"{PROTOCOL_PACKAGE}.ApplicationHandler",
     msg_type=APPLICATION,
     schema={
-        "label": fields.Str(required=True),
+        "service_id": fields.Str(required=True),
         "exchange_id": fields.Str(required=True),
     },
 )
