@@ -71,21 +71,16 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         try:
-            record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
-                services=context.message.services, connection_id=connection_id,
-            )
-            print("\n\nRECORD SAVE\n\n")
-            print(record)
-            if context.message.services != []:
-                assert record.services != []
-
-            await record.save(context)
-        except StorageDuplicateError:
             record = await ServiceDiscoveryRecord.retrieve_by_connection_id(
                 context, connection_id
             )
-            print("\n\RECORD RETRIEVE CONNENCTION _ID\n\n")
-            print(record)
             record.services = context.message.services
-            await record.save(context)
+        except StorageNotFoundError:
+            record: ServiceDiscoveryRecord = ServiceDiscoveryRecord(
+                services=context.message.services, connection_id=connection_id,
+            )
+
+        if context.message.services != []:
+            assert record.services != []
+        await record.save(context)
 
