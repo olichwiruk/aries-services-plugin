@@ -31,12 +31,7 @@ import json
 
 
 async def send_confirmation(context, responder, record: ServiceIssueRecord):
-    confirmation = Confirmation(
-        exchange_id=record.exchange_id,
-        service_schema=record.service_schema,
-        consent_schema=record.consent_schema,
-        state=record.state,
-    )
+    confirmation = Confirmation(exchange_id=record.exchange_id, state=record.state,)
 
     confirmation.assign_thread_from(context.message)
     await responder.send_reply(confirmation)

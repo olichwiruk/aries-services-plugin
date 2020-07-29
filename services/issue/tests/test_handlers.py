@@ -32,8 +32,6 @@ class TestIssueHandlers(AsyncTestCase):
 
     def assert_confirmation_record(self, record, state):
         assert isinstance(record, Confirmation)
-        assert self.service_schema == record.service_schema
-        assert self.consent_schema == record.consent_schema
         assert state == record.state
 
     def assert_issue_records_are_the_same(self, record1, record2):
@@ -95,12 +93,7 @@ class TestIssueHandlers(AsyncTestCase):
         )
         await record.save(context)
 
-        context.message = Confirmation(
-            exchange_id=self.exchange_id,
-            service_schema=self.service_schema,
-            consent_schema=self.consent_schema,
-            state=self.state,
-        )
+        context.message = Confirmation(exchange_id=self.exchange_id, state=self.state,)
 
         handler = ConfirmationHandler()
         await handler.handle(context, responder)

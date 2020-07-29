@@ -34,8 +34,6 @@ Confirmation, ConfirmationSchema = generate_model_schema(
     handler=f"{PROTOCOL_PACKAGE}.ConfirmationHandler",
     msg_type=CONFIRMATION,
     schema={
-        "service_schema": fields.Nested(ServiceSchema()),
-        "consent_schema": fields.Nested(ConsentSchema()),
         "exchange_id": fields.Str(required=True),
         "state": fields.Str(required=True),
     },
