@@ -35,9 +35,10 @@ class TestDiscovery(AsyncTestCase):
         "consent_schema": consentSchema,
         "service_schema": service_schema,
         "label": label,
+        "service_id": "1234",
     }
 
-    async def testDiscoveryResponseHandler(self):
+    async def test_discovery_response_handler(self):
         context = RequestContext()
         storage = BasicStorage()
         responder = MockResponder()
@@ -57,7 +58,7 @@ class TestDiscovery(AsyncTestCase):
         assert services[0].connection_id == self.connection_id
         assert services[0].services == [self.service]
 
-    async def testDiscoveryHandler(self):
+    async def test_discovery_handler(self):
         context = RequestContext()
         storage = BasicStorage()
         responder = MockResponder()
@@ -69,7 +70,7 @@ class TestDiscovery(AsyncTestCase):
             service_schema=self.service_schema,
             label=self.label,
         )
-        await record.save(context=context)
+        service_id = await record.save(context=context)
 
         context.message = Discovery()
 
@@ -77,3 +78,4 @@ class TestDiscovery(AsyncTestCase):
         await handler.handle(context, responder)
         assert len(responder.messages) == 1
         assert isinstance(responder.messages[0][0], DiscoveryResponse)
+        assert service_id == responder.messages[0][0].services[0].service_id

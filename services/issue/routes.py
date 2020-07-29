@@ -46,6 +46,7 @@ async def apply(request: web.BaseRequest):
             service_schema=params["service_schema"],
             consent_schema=params["consent_schema"],
             connection_id=params["connection_id"],
+            label=params["label"],
         )
 
         await record.save(context)

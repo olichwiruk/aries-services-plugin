@@ -45,7 +45,16 @@ class DiscoveryHandler(BaseHandler):
 
         query = await ServiceRecord().query(context)
 
-        response = DiscoveryResponse(services=query)
+        records = []
+        for service in query:
+            record = DiscoveryServiceSchema()
+            record.service_schema = service.service_schema
+            record.consent_schema = service.service_schema
+            record.label = service.label
+            record.service_id = service._id
+            records.append(record)
+
+        response = DiscoveryResponse(services=records)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)
 

@@ -86,3 +86,18 @@ async def get_service_list(request: web.BaseRequest):
         return web.json_response("Services for this connection id not found")
 
     return web.json_response(query.serialize())
+
+
+@docs(
+    tags=["Service Discovery"], summary="Get a list of all services I registered",
+)
+async def get_service_list(request: web.BaseRequest):
+    context = request.app["request_context"]
+    connection_id = request.match_info["connection_id"]
+
+    try:
+        query: ServiceRecord = await ServiceRecord().query(context)
+    except StorageNotFoundError:
+        return web.json_response("Services not found")
+
+    return web.json_response(query.serialize())

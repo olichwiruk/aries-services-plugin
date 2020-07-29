@@ -24,6 +24,7 @@ class TestServiceRecord(AsyncTestCase):
         "oca_schema_namespace": "test",
     }
     label = "service"
+    service_id = "1234"
 
     def create_default_context(self):
         context = InjectionContext()

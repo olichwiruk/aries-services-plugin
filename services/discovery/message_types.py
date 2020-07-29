@@ -26,6 +26,7 @@ Discovery, DiscoverySchema = generate_model_schema(
 
 class DiscoveryServiceSchema(Schema):
     label = fields.Str(required=True)
+    service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
 

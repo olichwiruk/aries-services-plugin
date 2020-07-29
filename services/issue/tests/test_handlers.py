@@ -57,11 +57,7 @@ class TestIssueHandlers(AsyncTestCase):
     async def test_application_handler(self):
         context, storage, responder = self.create_default_context()
 
-        context.message = Application(
-            consent_schema=self.consent_schema,
-            service_schema=self.service_schema,
-            exchange_id=self.exchange_id,
-        )
+        context.message = Application(exchange_id=self.exchange_id,)
 
         handler = ApplicationHandler()
         await handler.handle(context, responder)

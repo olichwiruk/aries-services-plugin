@@ -55,54 +55,9 @@ class ServiceRecord(BaseRecord):
             for prop in ("service_schema", "consent_schema", "label")
         }
 
-    async def save(
-        self,
-        context: InjectionContext,
-        *,
-        reason: str = None,
-        log_params: Mapping[str, Any] = None,
-        log_override: bool = False,
-        webhook: bool = None,
-    ) -> str:
-        """Persist the record to storage.
-
-        Args:
-            context: The injection context to use
-            reason: A reason to add to the log
-            log_params: Additional parameters to log
-            webhook: Flag to override whether the webhook is sent
-
-         NOTE: only deviation from the standard
-               is in id generation (hash based)
-        """
-        new_record = None
-        log_reason = reason or ("Updated record" if self._id else "Created record")
-        try:
-            self.updated_at = time_now()
-            storage: BaseStorage = await context.inject(BaseStorage)
-            if not self._id:
-                record_value = json.dumps(self.record_value)
-                self._id = hashlib.sha256(record_value.encode("UTF-8")).hexdigest()
-                self.created_at = self.updated_at
-                await storage.add_record(self.storage_record)
-                new_record = True
-            else:
-                record = self.storage_record
-                await storage.update_record_value(record, record.value)
-                await storage.update_record_tags(record, record.tags)
-                new_record = False
-        finally:
-            params = {self.RECORD_TYPE: self.serialize()}
-            if log_params:
-                params.update(log_params)
-            if new_record is None:
-                log_reason = f"FAILED: {log_reason}"
-            self.log_state(context, log_reason, params, override=log_override)
-
-        await self.post_save(context, new_record, self._last_state, webhook)
-        self._last_state = self.state
-
-        return self._id
+    @property
+    def record_tags(self) -> dict:
+        return {"label": self.label}
 
 
 class ServiceRecordSchema(BaseRecordSchema):
@@ -110,6 +65,7 @@ class ServiceRecordSchema(BaseRecordSchema):
         model_class = "ServiceRecord"
 
     label = fields.Str(required=True)
+    service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
 
@@ -154,55 +110,6 @@ class ServiceDiscoveryRecord(BaseRecord):
         return await cls.retrieve_by_tag_filter(
             context, {"connection_id": connection_id},
         )
-
-    async def save(
-        self,
-        context: InjectionContext,
-        *,
-        reason: str = None,
-        log_params: Mapping[str, Any] = None,
-        log_override: bool = False,
-        webhook: bool = None,
-    ) -> str:
-        """Persist the record to storage.
-
-        Args:
-            context: The injection context to use
-            reason: A reason to add to the log
-            log_params: Additional parameters to log
-            webhook: Flag to override whether the webhook is sent
-
-         NOTE: only deviation from the standard
-               is in id generation (hash based)
-        """
-        new_record = None
-        log_reason = reason or ("Updated record" if self._id else "Created record")
-        try:
-            self.updated_at = time_now()
-            storage: BaseStorage = await context.inject(BaseStorage)
-            if not self._id:
-                id_base = json.dumps(self.connection_id)
-                self._id = hashlib.sha256(id_base.encode("UTF-8")).hexdigest()
-                self.created_at = self.updated_at
-                await storage.add_record(self.storage_record)
-                new_record = True
-            else:
-                record = self.storage_record
-                await storage.update_record_value(record, record.value)
-                await storage.update_record_tags(record, record.tags)
-                new_record = False
-        finally:
-            params = {self.RECORD_TYPE: self.serialize()}
-            if log_params:
-                params.update(log_params)
-            if new_record is None:
-                log_reason = f"FAILED: {log_reason}"
-            self.log_state(context, log_reason, params, override=log_override)
-
-        await self.post_save(context, new_record, self._last_state, webhook)
-        self._last_state = self.state
-
-        return self._id
 
 
 class ServiceDiscoveryRecordSchema(BaseRecordSchema):
