@@ -13,17 +13,17 @@ async def register(app: web.Application):
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
-                "/verifiable-services/request-list/{connection_id}",
+                "/service-discovery/request-list/{connection_id}",
                 request_services_list,
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/get-list/{connection_id}",
+                "/service-discovery/get-list/{connection_id}",
                 get_service_list,
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/get-list/self",
+                "/service-discovery/get-list-self",
                 get_service_list_self,
                 allow_head=False,
             ),

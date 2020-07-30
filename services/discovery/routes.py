@@ -48,7 +48,8 @@ async def add_service(request: web.BaseRequest):
 
 
 @docs(
-    tags=["Service Discovery"], summary="Request a list of services from another agent",
+    tags=["Service Discovery"],
+    summary="Request a list of services from another agent and save them to storage, retrieve using get-list",
 )
 async def request_services_list(request: web.BaseRequest):
     context = request.app["request_context"]
@@ -72,7 +73,7 @@ async def request_services_list(request: web.BaseRequest):
 
 @docs(
     tags=["Service Discovery"],
-    summary="Get the saved list of services from another agent",
+    summary="Get the saved list of services from another agent, needs to be requested first / needs to be stored already",
 )
 async def get_service_list(request: web.BaseRequest):
     context = request.app["request_context"]

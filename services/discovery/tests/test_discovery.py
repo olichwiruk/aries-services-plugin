@@ -18,7 +18,7 @@ from ...discovery.message_types import *
 class TestDiscovery(AsyncTestCase):
     connection_id = "1234"
 
-    consentSchema = {
+    consent_schema = {
         "oca_schema_dri": "1234",
         "oca_schema_namespace": "test",
         "data_url": "http://test.com/test",
@@ -32,7 +32,7 @@ class TestDiscovery(AsyncTestCase):
     label = "abcd"
 
     service = {
-        "consent_schema": consentSchema,
+        "consent_schema": consent_schema,
         "service_schema": service_schema,
         "label": label,
         "service_id": "1234",
@@ -66,7 +66,7 @@ class TestDiscovery(AsyncTestCase):
         context.injector.bind_instance(BaseStorage, storage)
 
         record = ServiceRecord(
-            consent_schema=self.consentSchema,
+            consent_schema=self.consent_schema,
             service_schema=self.service_schema,
             label=self.label,
         )
