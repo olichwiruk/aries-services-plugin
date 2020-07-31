@@ -38,6 +38,12 @@ class ServiceRecord(BaseRecord):
         label: str = None,
         service_schema: str = None,
         consent_schema: str = None,
+        # those usually are created later
+        ledger_schema_id: str = None,
+        ledger_schema_definition: str = None,
+        ledger_credential_definition_id: str = None,
+        ledger_credential_definition: str = None,
+        #
         state: str = None,
         record_id: str = None,
         **keywordArgs,
@@ -46,13 +52,27 @@ class ServiceRecord(BaseRecord):
         self.consent_schema = consent_schema
         self.service_schema = service_schema
         self.label = label
+        # schema
+        self.ledger_schema_id = ledger_schema_id
+        self.ledger_schema_definition = ledger_schema_definition
+        # credential
+        self.ledger_credential_definition_id = ledger_credential_definition_id
+        self.ledger_credential_definition = ledger_credential_definition
 
     @property
     def record_value(self) -> dict:
         """Accessor to for the JSON record value properties"""
         return {
             prop: getattr(self, prop)
-            for prop in ("service_schema", "consent_schema", "label")
+            for prop in (
+                "service_schema",
+                "consent_schema",
+                "label",
+                "ledger_schema_id",
+                "ledger_credential_definition_id",
+                "ledger_schema_definition",
+                "ledger_credential_definition",
+            )
         }
 
     @property
@@ -68,6 +88,10 @@ class ServiceRecordSchema(BaseRecordSchema):
     service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
+    ledger_schema_id = (fields.Str(required=False),)
+    ledger_schema_definition = (fields.Str(required=False),)
+    ledger_credential_definition_id = (fields.Str(required=False),)
+    ledger_credential_definition = (fields.Str(required=False),)
 
 
 class ServiceDiscoveryRecord(BaseRecord):

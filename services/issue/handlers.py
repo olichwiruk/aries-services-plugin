@@ -7,6 +7,11 @@ from aries_cloudagent.messaging.base_handler import (
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.core.plugin_registry import PluginRegistry
+from aries_cloudagent.ledger.base import BaseLedger
+from aries_cloudagent.issuer.base import BaseIssuer
+from aries_cloudagent.ledger.error import LedgerError
+from aries_cloudagent.ledger.error import BadLedgerRequestError
+from aries_cloudagent.issuer.base import IssuerError
 from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
 
 # Records, messages and schemas
@@ -25,6 +30,7 @@ from .models import ServiceIssueRecord
 from ..discovery.models import ServiceRecord
 
 # External
+from asyncio import shield
 from marshmallow import fields, Schema
 import hashlib
 import uuid
@@ -59,6 +65,7 @@ class ApplicationHandler(BaseHandler):
             service: ServiceRecord = await ServiceRecord().retrieve_by_id(
                 context, context.message.service_id
             )
+            print("SERVICE_RECORD", service)
         except StorageNotFoundError:
             send_confirmation_long(
                 context,
@@ -82,6 +89,62 @@ class ApplicationHandler(BaseHandler):
         )
 
         await send_confirmation(context, responder, record)
+
+        # NOTE(Krzosa): check if schema and credential definition are registered on ledger
+        ledger: BaseLedger = await context.inject(BaseLedger)
+        issuer: BaseIssuer = await context.inject(BaseIssuer)
+
+        # NOTE(Krzosa): Register the schema on ledger if not registered
+        # and save the results in ServiceRecord
+        if service.ledger_schema_id == None:
+            async with ledger:
+                try:
+                    schema_id, schema_definition = await shield(
+                        ledger.create_and_send_schema(
+                            issuer,
+                            service.label,
+                            "1.0",
+                            ["consent_schema", "service_schema"],
+                        )
+                    )
+                    service.ledger_schema_id = schema_id
+                    service.ledger_schema_definition = schema_definition
+                    await service.save(context)
+                    print("LEDGER SCHEMA ID SAVE", schema_id, schema_definition)
+                except (IssuerError, LedgerError) as err:
+                    print(err)
+                    print("LEDGER_ERROR", err.roll_up)
+                    record.state = ServiceIssueRecord.ISSUE_SERVICE_NOT_FOUND
+                    await send_confirmation(context, responder, record)
+                    return
+
+        # NOTE(Krzosa): Register the credential definition on ledger if not registered
+        # and save the results in ServiceRecord
+        if (
+            service.ledger_schema_id != None
+            and service.ledger_credential_definition_id == None
+        ):
+            try:
+                async with ledger:
+                    credential_definition_id, credential_definition = await shield(
+                        ledger.create_and_send_credential_definition(
+                            issuer,
+                            service.ledger_schema_id,
+                            signature_type=None,
+                            tag="Services",
+                            support_revocation=False,
+                        )
+                    )
+                print(
+                    "LEDGER CRED DEF SAVE",
+                    credential_definition_id,
+                    credential_definition,
+                )
+                service.ledger_credential_definition = credential_definition
+                service.ledger_credential_definition_id = credential_definition_id
+                await service.save(context)
+            except (LedgerError, IssuerError, BadLedgerRequestError) as err:
+                print(err)
 
         # TODO: Some kind of decision mechanism
 

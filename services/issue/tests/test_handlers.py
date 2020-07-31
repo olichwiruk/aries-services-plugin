@@ -2,6 +2,10 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.messaging.responder import BaseResponder, MockResponder
 from aries_cloudagent.storage.base import BaseStorage, StorageRecord
 from aries_cloudagent.storage.basic import BasicStorage
+from aries_cloudagent.issuer.base import BaseIssuer
+from aries_cloudagent.issuer.indy import IndyIssuer
+from aries_cloudagent.ledger.base import BaseLedger
+from aries_cloudagent.ledger.indy import IndyLedger
 from asynctest import TestCase as AsyncTestCase, mock as async_mock
 
 import hashlib
@@ -57,6 +61,7 @@ class TestIssueHandlers(AsyncTestCase):
 
     async def test_application_handler(self):
         context, storage, responder = self.create_default_context()
+
         record = ServiceRecord(
             label=self.label,
             consent_schema=self.consent_schema,
