@@ -12,6 +12,8 @@ from aries_cloudagent.issuer.base import BaseIssuer
 from aries_cloudagent.ledger.error import LedgerError
 from aries_cloudagent.ledger.error import BadLedgerRequestError
 from aries_cloudagent.issuer.base import IssuerError
+from aries_cloudagent.protocols.issue_credential.v1_0.manager import CredentialManager
+from aries_cloudagent.protocols.issue_credential.v1_0.routes import _create_free_offer
 from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
 
 # Records, messages and schemas
@@ -37,8 +39,11 @@ import uuid
 import json
 
 
-async def send_confirmation(context, responder, record: ServiceIssueRecord):
+async def send_confirmation(context, responder, record: ServiceIssueRecord, state=None):
     print("send_confirmation")
+    if state != None:
+        record.state = state
+
     confirmation = Confirmation(exchange_id=record.exchange_id, state=record.state,)
 
     confirmation.assign_thread_from(context.message)
@@ -53,6 +58,7 @@ async def send_confirmation_long(context, responder, exchange_id, state):
     await responder.send_reply(confirmation)
 
 
+# TODO: use standard problem report?
 class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
@@ -114,8 +120,12 @@ class ApplicationHandler(BaseHandler):
                 except (IssuerError, LedgerError) as err:
                     print(err)
                     print("LEDGER_ERROR", err.roll_up)
-                    record.state = ServiceIssueRecord.ISSUE_SERVICE_NOT_FOUND
-                    await send_confirmation(context, responder, record)
+                    await send_confirmation(
+                        context,
+                        responder,
+                        record,
+                        ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR,
+                    )
                     return
 
         # NOTE(Krzosa): Register the credential definition on ledger if not registered
@@ -143,15 +153,59 @@ class ApplicationHandler(BaseHandler):
                 service.ledger_credential_definition = credential_definition
                 service.ledger_credential_definition_id = credential_definition_id
                 await service.save(context)
-            except (LedgerError, IssuerError, BadLedgerRequestError) as err:
-                print(err)
 
-        # TODO: Some kind of decision mechanism
+                await send_confirmation(
+                    context,
+                    responder,
+                    record,
+                    ServiceIssueRecord.ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE,
+                )
+
+            except (LedgerError, IssuerError, BadLedgerRequestError) as err:
+                await send_confirmation(
+                    context,
+                    responder,
+                    record,
+                    ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR,
+                )
+                return
+
+        credential_exchange_record, credential_offer_message = await _create_free_offer(
+            context,
+            service.ledger_credential_definition_id,
+            context.connection_record.connection_id,
+            False,
+            False,
+            {
+                "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
+                "attributes": [
+                    {
+                        "name": "label",
+                        "mime-type": "application/json",
+                        "value": "string",
+                    },
+                    {
+                        "name": "consent_schema",
+                        "mime-type": "application/json",
+                        "value": "string",
+                    },
+                    {
+                        "name": "service_schema",
+                        "mime-type": "application/json",
+                        "value": "string",
+                    },
+                ],
+            },
+        )
+
+        await responder.send_reply(credential_offer_message)
+        print("SUCCESS? ")
+
+        print("CREDENTIAL")
+        print(credential_exchange_record, credential_offer_message)
 
         record.state = ServiceIssueRecord.ISSUE_ACCEPTED
-        print("before save %s", record)
         await record.save(context)
-        print("after save %s", record)
 
         await send_confirmation(context, responder, record)
 

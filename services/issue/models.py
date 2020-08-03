@@ -20,6 +20,8 @@ class ServiceIssueRecord(BaseRecord):
 
     ISSUE_WAITING_FOR_RESPONSE = "waiting for response"
     ISSUE_SERVICE_NOT_FOUND = "service not found"
+    ISSUE_SERVICE_LEDGER_ERROR = "ledger error"
+    ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE = "cred prep complete"
     ISSUE_PENDING = "pending issue"
     ISSUE_REJECTED = "rejected issue"
     ISSUE_ACCEPTED = "accepted issue"
