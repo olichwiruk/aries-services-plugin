@@ -21,6 +21,12 @@ class ApplySchema(Schema):
     connection_id = fields.Str(required=True)
 
 
+class ApplicationStatusSchema(Schema):
+    service_id = fields.Str(required=False)
+    connection_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Apply to a service that connected agent provides, you need a service_id that you can get from service discovery request list",
@@ -64,6 +70,26 @@ async def apply(request: web.BaseRequest):
             service_id=record.service_id, exchange_id=record.exchange_id,
         )
         await outbound_handler(request, connection_id=params["connection_id"])
-        return web.json_response("success")
+        return web.json_response(request.serialize())
 
-    return web.json_response("connection not ready")
+    raise web.HTTPBadGateway
+
+
+@docs(
+    tags=["Verifiable Services"],
+    summary="Apply to a service that connected agent provides, you need a service_id that you can get from service discovery request list",
+)
+@request_schema(ApplicationStatusSchema())
+async def application_status(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = await request.json()
+
+    try:
+        query = await ServiceIssueRecord.query(context, tag_filter=context.message)
+    except StorageNotFoundError as err:
+        raise web.HTTPNotFound
+
+    query = [i.serialize() for i in query]
+
+    return web.json_response(query.serialize())
+

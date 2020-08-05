@@ -50,7 +50,7 @@ async def add_service(request: web.BaseRequest):
 
 @docs(
     tags=["Service Discovery"],
-    summary="Request a list of services from another agent and save them to storage, retrieve using get-list",
+    summary="Request a list of services from another agent and save them to storage, fetch services with fetch endpoint",
 )
 async def request_services_list(request: web.BaseRequest):
     # TODO: check for times so that we wont get the cached service list or delete record
@@ -76,7 +76,6 @@ async def request_services_list(request: web.BaseRequest):
         # To finally get the records
         max_retries = 8
         for i in range(max_retries):
-            time.sleep(1)
             try:
                 query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
                     context, connection_id
@@ -85,6 +84,7 @@ async def request_services_list(request: web.BaseRequest):
             except StorageNotFoundError:
                 if i >= max_retries:
                     raise web.HTTPRequestTimeout
+            time.sleep(1)
 
     raise web.HTTPNotFound
 
@@ -102,7 +102,7 @@ async def fetch_services(request: web.BaseRequest):
             context, connection_id
         )
     except StorageNotFoundError:
-        return web.json_response("Services for this connection id not found")
+        raise web.HTTPNotFound
 
     return web.json_response(query.serialize())
 
@@ -116,7 +116,7 @@ async def fetch_services_self(request: web.BaseRequest):
     try:
         query = await ServiceRecord().query(context)
     except StorageNotFoundError:
-        return web.json_response("Services not found")
+        raise web.HTTPNotFound
 
     query = [i.serialize() for i in query]
 

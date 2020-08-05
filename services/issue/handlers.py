@@ -48,9 +48,12 @@ from ..discovery.models import ServiceRecord
 # External
 from asyncio import shield
 from marshmallow import fields, Schema
+import logging
 import hashlib
 import uuid
 import json
+
+LOGGER = logging.getLogger(__name__)
 
 
 async def _create_free_offer(
@@ -104,23 +107,18 @@ async def _create_free_offer(
     return credential_exchange_record, credential_offer_message
 
 
-async def send_confirmation(context, responder, record: ServiceIssueRecord, state=None):
-    print("send_confirmation")
-    if state != None:
-        record.state = state
-
-    confirmation = Confirmation(exchange_id=record.exchange_id, state=record.state,)
-
-    confirmation.assign_thread_from(context.message)
-    await responder.send_reply(confirmation)
-
-
-async def send_confirmation_long(context, responder, exchange_id, state):
-    print("send_confirmation_long")
+async def send_confirmation_raw(context, responder, exchange_id, state=None):
+    LOGGER.info("send confirmation %s", state)
     confirmation = Confirmation(exchange_id=exchange_id, state=state,)
 
     confirmation.assign_thread_from(context.message)
     await responder.send_reply(confirmation)
+
+
+async def send_confirmation(context, responder, record: ServiceIssueRecord, state=None):
+    if state != None:
+        record.state = state
+    send_confirmation_raw(context, responder, record.exchange_id, record.state)
 
 
 # TODO: use standard problem report?
@@ -128,25 +126,21 @@ class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        print("APPLICATION HANDLER")
-        print(context.message)
+        LOGGER.info("Application Handler %s", context.message)
         assert isinstance(context.message, Application)
 
         try:
             service: ServiceRecord = await ServiceRecord().retrieve_by_id(
                 context, context.message.service_id
             )
-            print("SERVICE_RECORD", service)
         except StorageNotFoundError:
-            send_confirmation_long(
+            send_confirmation_raw(
                 context,
                 responder,
                 context.message.exchange_id,
                 ServiceIssueRecord.ISSUE_SERVICE_NOT_FOUND,
             )
             return
-
-        print("before record")
 
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
@@ -176,12 +170,12 @@ class ApplicationHandler(BaseHandler):
                             ["consent_schema", "service_schema"],
                         )
                     )
+                    LOGGER.info("OK Schema saved on ledger! %s", schema_id)
+
                     service.ledger_schema_id = schema_id
                     await service.save(context)
-                    print("LEDGER SCHEMA ID SAVE", schema_id, schema_definition)
                 except (IssuerError, LedgerError) as err:
-                    print(err)
-                    print("LEDGER_ERROR", err.roll_up)
+                    LOGGER.error("SCHEMA failed to save on LEDGER %s", err)
                     await send_confirmation(
                         context,
                         responder,
@@ -189,6 +183,11 @@ class ApplicationHandler(BaseHandler):
                         ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR,
                     )
                     return
+        else:
+            LOGGER.info(
+                "OK SCHEMA already exists for this service! %s",
+                service.ledger_schema_id,
+            )
 
         # NOTE(Krzosa): Register the credential definition on ledger if not registered
         # and save the results in ServiceRecord
@@ -207,10 +206,9 @@ class ApplicationHandler(BaseHandler):
                             support_revocation=False,
                         )
                     )
-                print(
-                    "LEDGER CRED DEF SAVE",
+                LOGGER.info(
+                    "OK CREDENTIAL DEFINITION saved on ledger! %s",
                     credential_definition_id,
-                    credential_definition,
                 )
                 service.ledger_credential_definition_id = credential_definition_id
                 await service.save(context)
@@ -223,6 +221,9 @@ class ApplicationHandler(BaseHandler):
                 )
 
             except (LedgerError, IssuerError, BadLedgerRequestError) as err:
+                LOGGER.error(
+                    "CREDENTIAL DEFINITION failed to create on ledger! %s", err,
+                )
                 await send_confirmation(
                     context,
                     responder,
@@ -230,6 +231,11 @@ class ApplicationHandler(BaseHandler):
                     ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR,
                 )
                 return
+        else:
+            LOGGER.info(
+                "OK CREDENTIAL DEFINITION already exists for this service! %s",
+                service.ledger_credential_definition_id,
+            )
 
         credential_exchange_record, credential_offer_message = await _create_free_offer(
             context,
@@ -258,24 +264,23 @@ class ApplicationHandler(BaseHandler):
                 ],
             },
         )
+        LOGGER.info(
+            "OK CREDENTIAL created! %s", credential_exchange_record,
+        )
 
         await responder.send_reply(credential_offer_message)
-        print("SUCCESS? ")
-
-        print("CREDENTIAL")
-        print(credential_exchange_record, credential_offer_message)
-
         record.state = ServiceIssueRecord.ISSUE_ACCEPTED
         await record.save(context)
 
         await send_confirmation(context, responder, record)
+        LOGGER.info("OK Application protocol end")
 
 
 class ConfirmationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        print("CONFIRMATION:\n %s", context.message)
+        LOGGER.info("OK Confirmation received %s", context.message)
         assert isinstance(context.message, Confirmation)
 
         try:
@@ -284,10 +289,9 @@ class ConfirmationHandler(BaseHandler):
                 context.message.exchange_id,
                 context.connection_record.connection_id,
             )
-        except StorageNotFoundError:
-            print("\n\nConfirmation Error\n\n")
+        except StorageNotFoundError as err:
+            LOGGER.info("ConfirmationHandler error %s", err)
             return
 
         record.state = context.message.state
-
-        await record.save(context)
+        await record.save(context, reason="Updated issue state")

@@ -18,6 +18,11 @@ async def register(app: web.Application):
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
+                "/verifiable-services/apply-status",
+                application_status,
+                allow_head=False,
+            ),
+            web.get(
                 "/verifiable-services/request/{connection_id}",
                 request_services_list,
                 allow_head=False,
