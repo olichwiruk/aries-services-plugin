@@ -118,7 +118,7 @@ async def send_confirmation_raw(context, responder, exchange_id, state=None):
 async def send_confirmation(context, responder, record: ServiceIssueRecord, state=None):
     if state != None:
         record.state = state
-    send_confirmation_raw(context, responder, record.exchange_id, record.state)
+    await send_confirmation_raw(context, responder, record.exchange_id, record.state)
 
 
 # TODO: use standard problem report?
@@ -134,7 +134,7 @@ class ApplicationHandler(BaseHandler):
                 context, context.message.service_id
             )
         except StorageNotFoundError:
-            send_confirmation_raw(
+            await send_confirmation_raw(
                 context,
                 responder,
                 context.message.exchange_id,

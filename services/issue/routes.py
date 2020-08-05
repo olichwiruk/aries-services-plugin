@@ -85,11 +85,11 @@ async def application_status(request: web.BaseRequest):
     params = await request.json()
 
     try:
-        query = await ServiceIssueRecord.query(context, tag_filter=context.message)
-    except StorageNotFoundError as err:
+        query = await ServiceIssueRecord.query(context, tag_filter=params)
+    except StorageNotFoundError:
         raise web.HTTPNotFound
 
     query = [i.serialize() for i in query]
 
-    return web.json_response(query.serialize())
+    return web.json_response(query)
 

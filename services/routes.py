@@ -11,10 +11,6 @@ from .action_issue.routes import *
 async def register(app: web.Application):
     app.add_routes(
         [
-            web.post(
-                "/verifiable-services/debug-send-services-menu/{connection_id}",
-                send_services_menu,
-            ),
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
