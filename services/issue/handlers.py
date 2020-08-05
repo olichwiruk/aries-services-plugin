@@ -9,19 +9,33 @@ from aries_cloudagent.config.injection_context import InjectionContext
 from aries_cloudagent.core.plugin_registry import PluginRegistry
 from aries_cloudagent.ledger.base import BaseLedger
 from aries_cloudagent.issuer.base import BaseIssuer
-from aries_cloudagent.ledger.error import LedgerError
-from aries_cloudagent.ledger.error import BadLedgerRequestError
-from aries_cloudagent.issuer.base import IssuerError
 from aries_cloudagent.protocols.issue_credential.v1_0.manager import CredentialManager
-from aries_cloudagent.protocols.issue_credential.v1_0.routes import _create_free_offer
 from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
 
+
 # Records, messages and schemas
+from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_proposal import (
+    CredentialProposal,
+)
+from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_offer import (
+    CredentialOfferSchema,
+)
+from aries_cloudagent.protocols.issue_credential.v1_0.messages.inner.credential_preview import (
+    CredentialPreview,
+    CredentialPreviewSchema,
+)
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.storage.record import StorageRecord
+from aries_cloudagent.protocols.issue_credential.v1_0.models.credential_exchange import (
+    V10CredentialExchange,
+    V10CredentialExchangeSchema,
+)
 
 # Exceptions
+from aries_cloudagent.ledger.error import LedgerError
+from aries_cloudagent.ledger.error import BadLedgerRequestError
+from aries_cloudagent.issuer.base import IssuerError
 from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoundError
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
@@ -37,6 +51,57 @@ from marshmallow import fields, Schema
 import hashlib
 import uuid
 import json
+
+
+async def _create_free_offer(
+    context,
+    cred_def_id: str,
+    connection_id: str = None,
+    auto_issue: bool = False,
+    auto_remove: bool = False,
+    preview_spec: dict = None,
+    comment: str = None,
+    trace_msg: bool = None,
+):
+    """Create a credential offer and related exchange record."""
+
+    assert cred_def_id, "cred_def_id is required"
+    if auto_issue and not preview_spec:
+        assert False, "If auto_issue is set then credential_preview must be provided"
+
+    if preview_spec:
+        credential_preview = CredentialPreview.deserialize(preview_spec)
+        credential_proposal = CredentialProposal(
+            comment=comment,
+            credential_proposal=credential_preview,
+            cred_def_id=cred_def_id,
+        )
+        credential_proposal.assign_trace_decorator(
+            context.settings, trace_msg,
+        )
+        credential_proposal_dict = credential_proposal.serialize()
+    else:
+        credential_proposal_dict = None
+
+    credential_exchange_record = V10CredentialExchange(
+        connection_id=connection_id,
+        initiator=V10CredentialExchange.INITIATOR_SELF,
+        credential_definition_id=cred_def_id,
+        credential_proposal_dict=credential_proposal_dict,
+        auto_issue=auto_issue,
+        auto_remove=auto_remove,
+        trace=trace_msg,
+    )
+
+    credential_manager = CredentialManager(context)
+
+    (
+        credential_exchange_record,
+        credential_offer_message,
+    ) = await credential_manager.create_offer(
+        credential_exchange_record, comment=comment
+    )
+    return credential_exchange_record, credential_offer_message
 
 
 async def send_confirmation(context, responder, record: ServiceIssueRecord, state=None):
@@ -86,8 +151,6 @@ class ApplicationHandler(BaseHandler):
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
-            service_schema=service.service_schema,
-            consent_schema=service.consent_schema,
             connection_id=context.connection_record.connection_id,
             exchange_id=context.message.exchange_id,
             service_id=context.message.service_id,
@@ -114,7 +177,6 @@ class ApplicationHandler(BaseHandler):
                         )
                     )
                     service.ledger_schema_id = schema_id
-                    service.ledger_schema_definition = schema_definition
                     await service.save(context)
                     print("LEDGER SCHEMA ID SAVE", schema_id, schema_definition)
                 except (IssuerError, LedgerError) as err:
@@ -150,7 +212,6 @@ class ApplicationHandler(BaseHandler):
                     credential_definition_id,
                     credential_definition,
                 )
-                service.ledger_credential_definition = credential_definition
                 service.ledger_credential_definition_id = credential_definition_id
                 await service.save(context)
 

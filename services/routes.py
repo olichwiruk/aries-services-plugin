@@ -2,6 +2,7 @@ from aiohttp import web
 
 from .issue.routes import *
 from .discovery.routes import *
+from .action_issue.routes import *
 
 # NOTE: define functions in sub routes files (i.e issue.routes) and register
 # them here
@@ -10,21 +11,25 @@ from .discovery.routes import *
 async def register(app: web.Application):
     app.add_routes(
         [
+            web.post(
+                "/verifiable-services/debug-send-services-menu/{connection_id}",
+                send_services_menu,
+            ),
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
-                "/service-discovery/request-list/{connection_id}",
+                "/verifiable-services/request/{connection_id}",
                 request_services_list,
                 allow_head=False,
             ),
             web.get(
-                "/service-discovery/get-list/{connection_id}",
-                get_service_list,
+                "/verifiable-services/fetch-list/{connection_id}",
+                fetch_services,
                 allow_head=False,
             ),
             web.get(
-                "/service-discovery/get-list-self",
-                get_service_list_self,
+                "/verifiable-services/fetch-self",
+                fetch_services_self,
                 allow_head=False,
             ),
         ]

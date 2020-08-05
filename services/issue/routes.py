@@ -54,8 +54,6 @@ async def apply(request: web.BaseRequest):
             connection_id=params["connection_id"],
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
             author=ServiceIssueRecord.AUTHOR_SELF,
-            service_schema=service["service_schema"],
-            consent_schema=service["consent_schema"],
             service_id=service["service_id"],
             label=service["label"],
         )

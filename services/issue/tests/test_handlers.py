@@ -40,8 +40,6 @@ class TestIssueHandlers(AsyncTestCase):
         assert state == record.state
 
     def assert_issue_records_are_the_same(self, record1, record2):
-        assert record1.service_schema == record2.service_schema
-        assert record1.consent_schema == record2.consent_schema
         assert record1.state == record2.state
         assert record1.author == record2.author
         assert record1.exchange_id == record2.exchange_id
@@ -96,8 +94,6 @@ class TestIssueHandlers(AsyncTestCase):
         record = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
-            service_schema=self.service_schema,
-            consent_schema=self.consent_schema,
             connection_id=self.connection_id,
             exchange_id=self.exchange_id,
         )

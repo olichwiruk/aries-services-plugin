@@ -39,8 +39,6 @@ class ServiceIssueRecord(BaseRecord):
         author: str = None,
         service_id: str = None,
         label: str = None,
-        service_schema: ServiceSchema = None,
-        consent_schema: ConsentSchema = None,
         connection_id: str = None,
         exchange_id: str = None,
         record_id: str = None,
@@ -48,8 +46,6 @@ class ServiceIssueRecord(BaseRecord):
     ):
         super().__init__(record_id, state, **keywordArgs)
         self.service_id = service_id
-        self.service_schema = service_schema
-        self.consent_schema = consent_schema
         self.connection_id = connection_id
         self.author = author
         self.label = label
@@ -61,8 +57,6 @@ class ServiceIssueRecord(BaseRecord):
         return {
             prop: getattr(self, prop)
             for prop in (
-                "service_schema",
-                "consent_schema",
                 "connection_id",
                 "state",
                 "author",
@@ -162,5 +156,3 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     exchange_id = fields.Str(required=False)
     label = fields.Str(required=False)
     service_id = fields.Str(required=False)
-    service_schema = fields.Nested(ServiceSchema())
-    consent_schema = fields.Nested(ConsentSchema())

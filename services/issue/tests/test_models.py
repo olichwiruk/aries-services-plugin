@@ -30,8 +30,6 @@ class TestServiceRecord(AsyncTestCase):
     author = ServiceIssueRecord.AUTHOR_SELF
 
     def assert_self_record(self, record):
-        assert self.service_schema == record.service_schema
-        assert self.consent_schema == record.consent_schema
         assert self.connection_id == record.connection_id
         assert self.exchange_id == record.exchange_id
         assert self.author == record.author
@@ -41,8 +39,6 @@ class TestServiceRecord(AsyncTestCase):
         record = ServiceIssueRecord(
             state=self.state,
             author=self.author,
-            service_schema=self.service_schema,
-            consent_schema=self.consent_schema,
             connection_id=self.connection_id,
             exchange_id=self.exchange_id,
         )
