@@ -19,9 +19,10 @@ from .models import ServiceIssueRecord
 class ApplySchema(Schema):
     service_id = fields.Str(required=True)
     connection_id = fields.Str(required=True)
+    payload = fields.Str(required=True)
 
 
-class ApplicationStatusSchema(Schema):
+class ApplyStatusSchema(Schema):
     service_id = fields.Str(required=False)
     connection_id = fields.Str(required=False)
     exchange_id = fields.Str(required=False)
@@ -62,6 +63,9 @@ async def apply(request: web.BaseRequest):
             author=ServiceIssueRecord.AUTHOR_SELF,
             service_id=service["service_id"],
             label=service["label"],
+            consent_schema=service["consent_schema"],
+            service_schema=service["service_schema"],
+            payload=params["payload"],
         )
 
         await record.save(context)
@@ -79,8 +83,8 @@ async def apply(request: web.BaseRequest):
     tags=["Verifiable Services"],
     summary="Apply to a service that connected agent provides, you need a service_id that you can get from service discovery request list",
 )
-@request_schema(ApplicationStatusSchema())
-async def application_status(request: web.BaseRequest):
+@request_schema(ApplyStatusSchema())
+async def apply_status(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
@@ -93,3 +97,28 @@ async def application_status(request: web.BaseRequest):
 
     return web.json_response(query)
 
+
+@docs(
+    tags=["Verifiable Services"], summary="Get consent schema, payload, service schema",
+)
+@request_schema(ApplyStatusSchema())
+async def get_issue(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = await request.json()
+
+    try:
+        query = await ServiceIssueRecord.query(context, tag_filter=params)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    result = []
+    for i in query:
+        record = {
+            "label": i.label,
+            "payload": i.payload,
+            "service_schema": i.service_schema,
+            "consent_schema": i.consent_schema,
+        }
+        result.append(record)
+
+    return web.json_response(result)

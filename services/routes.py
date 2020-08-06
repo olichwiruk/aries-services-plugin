@@ -2,7 +2,6 @@ from aiohttp import web
 
 from .issue.routes import *
 from .discovery.routes import *
-from .action_issue.routes import *
 
 # NOTE: define functions in sub routes files (i.e issue.routes) and register
 # them here
@@ -14,9 +13,7 @@ async def register(app: web.Application):
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
             web.get(
-                "/verifiable-services/apply-status",
-                application_status,
-                allow_head=False,
+                "/verifiable-services/apply-status", apply_status, allow_head=False,
             ),
             web.get(
                 "/verifiable-services/request/{connection_id}",
@@ -33,5 +30,6 @@ async def register(app: web.Application):
                 fetch_services_self,
                 allow_head=False,
             ),
+            web.get("/verifiable-services/get-issue", get_issue, allow_head=False,),
         ]
     )

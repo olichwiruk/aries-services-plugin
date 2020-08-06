@@ -153,7 +153,6 @@ class ApplicationHandler(BaseHandler):
 
         await send_confirmation(context, responder, record)
 
-        # NOTE(Krzosa): check if schema and credential definition are registered on ledger
         ledger: BaseLedger = await context.inject(BaseLedger)
         issuer: BaseIssuer = await context.inject(BaseIssuer)
 
@@ -167,7 +166,7 @@ class ApplicationHandler(BaseHandler):
                             issuer,
                             service.label,
                             "1.0",
-                            ["consent_schema", "service_schema"],
+                            ["consent_schema", "service_schema", "label"],
                         )
                     )
                     LOGGER.info("OK Schema saved on ledger! %s", schema_id)
@@ -213,13 +212,6 @@ class ApplicationHandler(BaseHandler):
                 service.ledger_credential_definition_id = credential_definition_id
                 await service.save(context)
 
-                await send_confirmation(
-                    context,
-                    responder,
-                    record,
-                    ServiceIssueRecord.ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE,
-                )
-
             except (LedgerError, IssuerError, BadLedgerRequestError) as err:
                 LOGGER.error(
                     "CREDENTIAL DEFINITION failed to create on ledger! %s", err,
@@ -237,6 +229,14 @@ class ApplicationHandler(BaseHandler):
                 service.ledger_credential_definition_id,
             )
 
+        await send_confirmation(
+            context,
+            responder,
+            record,
+            ServiceIssueRecord.ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE,
+        )
+
+        # NOTE(Krzosa): Create credential
         credential_exchange_record, credential_offer_message = await _create_free_offer(
             context,
             service.ledger_credential_definition_id,
@@ -264,9 +264,7 @@ class ApplicationHandler(BaseHandler):
                 ],
             },
         )
-        LOGGER.info(
-            "OK CREDENTIAL created! %s", credential_exchange_record,
-        )
+        LOGGER.info("OK CREDENTIAL created! %s", credential_exchange_record)
 
         await responder.send_reply(credential_offer_message)
         record.state = ServiceIssueRecord.ISSUE_ACCEPTED

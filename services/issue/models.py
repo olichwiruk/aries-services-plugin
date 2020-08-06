@@ -22,9 +22,9 @@ class ServiceIssueRecord(BaseRecord):
     ISSUE_SERVICE_NOT_FOUND = "service not found"
     ISSUE_SERVICE_LEDGER_ERROR = "ledger error"
     ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE = "cred prep complete"
-    ISSUE_PENDING = "pending issue"
-    ISSUE_REJECTED = "rejected issue"
-    ISSUE_ACCEPTED = "accepted issue"
+    ISSUE_PENDING = "pending"
+    ISSUE_REJECTED = "rejected"
+    ISSUE_ACCEPTED = "accepted"
 
     AUTHOR_SELF = "self"
     AUTHOR_OTHER = "other"
@@ -38,8 +38,13 @@ class ServiceIssueRecord(BaseRecord):
         state: str = None,
         author: str = None,
         service_id: str = None,
-        label: str = None,
         connection_id: str = None,
+        # Holder / (cred requester) values
+        label: str = None,
+        payload: str = None,
+        consent_schema: ConsentSchema = None,
+        service_schema: ServiceSchema = None,
+        #
         exchange_id: str = None,
         record_id: str = None,
         **keywordArgs,
@@ -48,8 +53,12 @@ class ServiceIssueRecord(BaseRecord):
         self.service_id = service_id
         self.connection_id = connection_id
         self.author = author
-        self.label = label
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
+        # Holder / (cred requester) values
+        self.label = label
+        self.payload = payload
+        self.consent_schema = consent_schema
+        self.service_schema = service_schema
 
     @property
     def record_value(self) -> dict:
@@ -63,6 +72,9 @@ class ServiceIssueRecord(BaseRecord):
                 "exchange_id",
                 "service_id",
                 "label",
+                "payload",
+                "consent_schema",
+                "service_schema",
             )
         }
 
@@ -81,6 +93,7 @@ class ServiceIssueRecord(BaseRecord):
             "state": self.state,
             "author": self.author,
             "label": self.label,
+            "payload": self.payload,
         }
 
     @classmethod
