@@ -18,7 +18,7 @@ class ServiceIssueRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "service_issue"
 
-    ISSUE_WAITING_FOR_RESPONSE = "waiting for response"
+    ISSUE_WAITING_FOR_RESPONSE = "no response"
     ISSUE_SERVICE_NOT_FOUND = "service not found"
     ISSUE_SERVICE_LEDGER_ERROR = "ledger error"
     ISSUE_CREDENTIAL_DEFINITION_PREPARATION_COMPLETE = "cred prep complete"
@@ -90,10 +90,10 @@ class ServiceIssueRecord(BaseRecord):
         return {
             "connection_id": self.connection_id,
             "exchange_id": self.exchange_id,
+            "service_id": self.service_id,
             "state": self.state,
             "author": self.author,
             "label": self.label,
-            "payload": self.payload,
         }
 
     @classmethod

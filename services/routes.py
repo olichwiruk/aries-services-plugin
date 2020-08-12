@@ -12,6 +12,9 @@ async def register(app: web.Application):
         [
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
+            web.post("/verifiable-services/get-issue", get_issue,),
+            web.post("/verifiable-services/get-issue-self", get_issue_self,),
+            web.post("/verifiable-services/process-application", process_application,),
             web.get(
                 "/verifiable-services/apply-status", apply_status, allow_head=False,
             ),
@@ -30,6 +33,5 @@ async def register(app: web.Application):
                 fetch_services_self,
                 allow_head=False,
             ),
-            web.get("/verifiable-services/get-issue", get_issue, allow_head=False,),
         ]
     )

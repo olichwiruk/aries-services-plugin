@@ -36,8 +36,8 @@ class ServiceRecord(BaseRecord):
         self,
         *,
         label: str = None,
-        service_schema: str = None,
-        consent_schema: str = None,
+        service_schema: ServiceSchema = None,
+        consent_schema: ConsentSchema = None,
         # those usually are created later
         ledger_schema_id: str = None,
         ledger_credential_definition_id: str = None,
