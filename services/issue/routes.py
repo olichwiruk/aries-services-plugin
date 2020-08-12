@@ -32,6 +32,7 @@ from aiohttp_apispec import docs, request_schema
 from marshmallow import fields, Schema
 import logging
 import hashlib
+import json
 from typing import Sequence
 from asyncio import shield
 
@@ -57,7 +58,7 @@ class ApplyStatusSchema(Schema):
 
 
 class GetIssueSchema(Schema):
-    issue_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
     connection_id = fields.Str(required=False)
 
 
@@ -229,15 +230,12 @@ async def process_application(request: web.BaseRequest):
     ACCEPTED = ServiceIssueRecord.ISSUE_ACCEPTED
 
     try:
-        print("Yes")
         issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
             context, params["issue_id"]
         )
-        print("ISSUE: ", issue)
         service: ServiceRecord = await ServiceRecord.retrieve_by_id(
             context, issue.service_id
         )
-        print("Service: ", service)
     except StorageNotFoundError:
         raise web.HTTPNotFound
 
@@ -325,21 +323,25 @@ async def process_application(request: web.BaseRequest):
         context,
         service.ledger_credential_definition_id,
         issue.connection_id,
-        False,
+        True,
         False,
         {
             "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
             "attributes": [
-                {"name": "label", "mime-type": "application/json", "value": "string",},
+                {
+                    "name": "label",
+                    "mime-type": "application/json",
+                    "value": service.label,
+                },
                 {
                     "name": "consent_schema",
                     "mime-type": "application/json",
-                    "value": "string",
+                    "value": json.dumps(service.consent_schema),
                 },
                 {
                     "name": "service_schema",
                     "mime-type": "application/json",
-                    "value": "string",
+                    "value": json.dumps(service.service_schema),
                 },
             ],
         },
@@ -351,7 +353,12 @@ async def process_application(request: web.BaseRequest):
 
     await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
     await confirmer.send_confirmation(ACCEPTED)
-    return web.json_response(issue.serialize())
+    return web.json_response(
+        {
+            "issue": issue.serialize(),
+            "credential_exchange_record": credential_exchange_record.serialize(),
+        }
+    )
 
 
 @docs(
@@ -388,7 +395,15 @@ async def get_issue_self(request: web.BaseRequest):
     result = []
     for i in query:
         record: dict = i.serialize()
-        record.update({"issue_id": i._id})
+        record.update(
+            {
+                "issue_id": i._id,
+                "label": i.label,
+                "payload": i.payload,
+                "service_schema": json.dumps(i.service_schema),
+                "consent_schema": json.dumps(i.consent_schema),
+            }
+        )
         result.append(record)
 
     return web.json_response(result)
@@ -411,8 +426,8 @@ async def get_issue(request: web.BaseRequest):
         raise web.HTTPNotFound
 
     if connection.is_ready:
-        request = GetIssue(issue_id=params["issue_id"])
-        await outbound_handler(request, connection_id=params["connection_id"])
+        request = GetIssue(exchange_id=params["exchange_id"])
+        await outbound_handler(request, connection_id=connection.connection_id)
         return web.json_response(request.serialize())
 
     raise web.HTTPNotFound

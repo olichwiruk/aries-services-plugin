@@ -129,30 +129,53 @@ class GetIssueHandler(BaseHandler):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         LOGGER.info("OK GetIssueHandler received %s", context.message)
+        print("OK GetIssueHandler", context.message)
         assert isinstance(context.message, GetIssue)
 
         try:
-            record = await ServiceIssueRecord.retrieve_by_id(
-                context, context.message.issue_id
+            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
             )
         except StorageNotFoundError as err:
-            LOGGER.info("GetIssueHandler error %s", err)
+            LOGGER.error("GetIssueHandler error %s", err)
             return
 
         response = ReceiveIssue(
             label=record.label,
             payload=record.payload,
-            service_schema=record.service_schema,
-            consent_schema=record.consent_schema,
+            service_schema=json.dumps(record.service_schema),
+            consent_schema=json.dumps(record.consent_schema),
+            exchange_id=record.exchange_id,
         )
+
+        response.assign_thread_from(context.message)
         await responder.send_reply(response)
 
 
 class ReceiveIssueHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        LOGGER.info("OK ReceiveIssueHandler received")
+        print("OK ReceiveIssueHandler received")
         assert isinstance(context.message, ReceiveIssue)
 
-        LOGGER.info("Service Info: \n")
-        LOGGER.info(context.message)
+        try:
+            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
+            )
+        except StorageNotFoundError as err:
+            LOGGER.error("ReceiveIssueHandler error %s", err)
+            return
+
+        if record.label == None:
+            record.label = context.message.label
+        if record.payload == None:
+            record.payload = context.message.payload
+        if record.service_schema == None:
+            record.service_schema = json.loads(context.message.service_schema)
+        if record.consent_schema == None:
+            record.consent_schema = json.loads(context.message.consent_schema)
+        await record.save(context)
 

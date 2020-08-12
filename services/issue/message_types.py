@@ -46,7 +46,7 @@ GetIssue, GetIssueSchema = generate_model_schema(
     name="GetIssue",
     handler=f"{PROTOCOL_PACKAGE}.GetIssueHandler",
     msg_type=GET_ISSUE,
-    schema={"issue_id": fields.Str(required=True),},
+    schema={"exchange_id": fields.Str(required=True),},
 )
 
 ReceiveIssue, ReceiveIssueSchema = generate_model_schema(
@@ -58,5 +58,6 @@ ReceiveIssue, ReceiveIssueSchema = generate_model_schema(
         "payload": fields.Str(required=False),
         "consent_schema": fields.Str(required=False),
         "service_schema": fields.Str(required=False),
+        "exchange_id": fields.Str(required=False),
     },
 )
