@@ -380,11 +380,16 @@ async def process_application(request: web.BaseRequest):
     AUTHORS:
     "self"
     "other"
+
+    This endpoint under the hood calls all the agents that we have 
+    uncomplete information about and requests the uncomplete information (payload)
+    that information can be retrieved on the next call to get-issue-self
     """,
 )
 @request_schema(GetIssueSelfSchema())
 async def get_issue_self(request: web.BaseRequest):
     context = request.app["request_context"]
+    outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
 
     try:
@@ -395,6 +400,8 @@ async def get_issue_self(request: web.BaseRequest):
     result = []
     for i in query:
         record: dict = i.serialize()
+        # NOTE(Krzosa): serialize additional fields which are not serializable
+        # by default
         record.update(
             {
                 "issue_id": i._id,
@@ -406,11 +413,17 @@ async def get_issue_self(request: web.BaseRequest):
         )
         result.append(record)
 
+        # NOTE(Krzosa): request additional information from the agent
+        # that we had this interaction with
+        if record.payload == None:
+            request = GetIssue(exchange_id=i.exchange_id)
+            await outbound_handler(request, connection_id=i.connection_id)
+
     return web.json_response(result)
 
 
 @docs(
-    tags=["Verifiable Services"], summary="Get consent schema, payload, service schema",
+    tags=["Verifiable Services"], summary="needs a rework",
 )
 @request_schema(GetIssueSchema())
 async def get_issue(request: web.BaseRequest):
