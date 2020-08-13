@@ -71,6 +71,146 @@ class GetIssueSelfSchema(Schema):
     state = fields.Str(required=False)
 
 
+class ServiceManager:
+    """
+    Create instance of this class with create_service_manager function
+
+    errors from functions should be handled with this
+    except (IssuerError, LedgerError, BadLedgerRequestError) as err:
+    """
+
+    def __init__(self, service: ServiceRecord):
+        self.service: ServiceRecord = service
+
+    async def init_context(self, context):
+        self.context = context
+        self.ledger: BaseLedger = await context.inject(BaseLedger)
+        self.issuer: BaseIssuer = await context.inject(BaseIssuer)
+
+    async def create_schema(self):
+        """
+        Register the schema on ledger if not registered
+        and save the results in self.service ServiceRecord
+        """
+        if self.service.ledger_schema_id == None:
+            async with self.ledger:
+                schema_id, schema_definition = await shield(
+                    self.ledger.create_and_send_schema(
+                        self.issuer,
+                        self.service.label,
+                        "1.0",
+                        ["consent_schema", "service_schema", "label"],
+                    )
+                )
+                LOGGER.info("OK Schema saved on ledger! %s", schema_id)
+
+                self.service.ledger_schema_id = schema_id
+                await self.service.save(self.context)
+        else:
+            LOGGER.info(
+                "OK SCHEMA already exists for this service! %s",
+                self.service.ledger_schema_id,
+            )
+
+    async def create_credential_definition(self):
+        """
+        Register the credential definition on ledger
+        Requirements: 
+            schema already registered, 
+            credential definition not registered yet
+        """
+        if (
+            self.service.ledger_schema_id != None
+            and self.service.ledger_credential_definition_id == None
+        ):
+            async with self.ledger:
+                credential_definition_id, credential_definition = await shield(
+                    self.ledger.create_and_send_credential_definition(
+                        self.issuer,
+                        self.service.ledger_schema_id,
+                        signature_type=None,
+                        tag="Services",
+                        support_revocation=False,
+                    )
+                )
+            LOGGER.info(
+                "OK CREDENTIAL DEFINITION saved on ledger! %s",
+                credential_definition_id,
+            )
+            self.service.ledger_credential_definition_id = credential_definition_id
+            await self.service.save(self.context)
+        else:
+            LOGGER.info(
+                "OK CREDENTIAL DEFINITION already exists for this service! %s",
+                self.service.ledger_credential_definition_id,
+            )
+
+    async def create_credential_offer(
+        self,
+        connection_id: str = None,
+        preview_spec: dict = None,
+        auto_issue: bool = False,
+        auto_remove: bool = False,
+        comment: str = None,
+        trace_message: bool = None,
+    ):
+        """
+        Create a credential offer and related exchange record.
+        returns: credential_exchange_record, credential_offer_message
+        """
+
+        assert (
+            self.service.ledger_credential_definition_id
+        ), "self.service.ledger_credential_definition_id is required"
+        if auto_issue and not preview_spec:
+            assert (
+                False
+            ), "If auto_issue is set then credential_preview must be provided"
+
+        if preview_spec:
+            credential_preview = CredentialPreview.deserialize(preview_spec)
+            credential_proposal = CredentialProposal(
+                comment=comment,
+                credential_proposal=credential_preview,
+                cred_def_id=self.service.ledger_credential_definition_id,
+            )
+            credential_proposal.assign_trace_decorator(
+                self.context.settings, trace_message,
+            )
+            credential_proposal_dict = credential_proposal.serialize()
+        else:
+            credential_proposal_dict = None
+
+        credential_exchange_record = V10CredentialExchange(
+            connection_id=connection_id,
+            initiator=V10CredentialExchange.INITIATOR_SELF,
+            credential_definition_id=self.service.ledger_credential_definition_id,
+            credential_proposal_dict=credential_proposal_dict,
+            auto_issue=auto_issue,
+            auto_remove=auto_remove,
+            trace=trace_message,
+        )
+
+        credential_manager = CredentialManager(self.context)
+
+        (
+            credential_exchange_record,
+            credential_offer_message,
+        ) = await credential_manager.create_offer(
+            credential_exchange_record, comment=comment
+        )
+
+        LOGGER.info("Credential offer created")
+        return credential_exchange_record, credential_offer_message
+
+
+async def create_service_manager(context, service):
+    manager = ServiceManager(service)
+    await manager.init_context(context)
+
+    return manager
+
+
 async def _create_free_offer(
     context,
     cred_def_id: str,
@@ -248,105 +388,46 @@ async def process_application(request: web.BaseRequest):
         await confirmer.send_confirmation(REJECTED)
         return web.json_response(issue.serialize())
 
-    # NOTE(Krzosa): Else if decision is "accept" we proceed to creating
-    # a credential offer
+    service_manager: ServiceManager = await create_service_manager(context, service)
 
-    ledger: BaseLedger = await context.inject(BaseLedger)
-    issuer: BaseIssuer = await context.inject(BaseIssuer)
-
-    # NOTE(Krzosa): Register the schema on ledger if not registered
-    # and save the results in ServiceRecord
-    if service.ledger_schema_id == None:
-        async with ledger:
-            try:
-                schema_id, schema_definition = await shield(
-                    ledger.create_and_send_schema(
-                        issuer,
-                        service.label,
-                        "1.0",
-                        ["consent_schema", "service_schema", "label"],
-                    )
-                )
-                LOGGER.info("OK Schema saved on ledger! %s", schema_id)
-
-                service.ledger_schema_id = schema_id
-                await service.save(context)
-            except (IssuerError, LedgerError) as err:
-                LOGGER.error("SCHEMA failed to save on LEDGER %s", err)
-                issue.state = LEDGER_ERROR
-                await confirmer.send_confirmation(LEDGER_ERROR)
-                return web.json_response(issue.serialize())
-    else:
-        LOGGER.info(
-            "OK SCHEMA already exists for this service! %s", service.ledger_schema_id,
+    try:
+        await service_manager.create_schema()
+        await service_manager.create_credential_definition()
+        (
+            credential_exchange_record,
+            credential_offer_message,
+        ) = await service_manager.create_credential_offer(
+            connection_id=issue.connection_id,
+            preview_spec={
+                "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
+                "attributes": [
+                    {
+                        "name": "label",
+                        "mime-type": "application/json",
+                        "value": service.label,
+                    },
+                    {
+                        "name": "consent_schema",
+                        "mime-type": "application/json",
+                        "value": json.dumps(service.consent_schema),
+                    },
+                    {
+                        "name": "service_schema",
+                        "mime-type": "application/json",
+                        "value": json.dumps(service.service_schema),
+                    },
+                ],
+            },
+            auto_issue=True,
+            auto_remove=False,
         )
-
-    # NOTE(Krzosa): Register the credential definition on ledger if not registered
-    # and save the results in ServiceRecord
-    if (
-        service.ledger_schema_id != None
-        and service.ledger_credential_definition_id == None
-    ):
-        try:
-            async with ledger:
-                credential_definition_id, credential_definition = await shield(
-                    ledger.create_and_send_credential_definition(
-                        issuer,
-                        service.ledger_schema_id,
-                        signature_type=None,
-                        tag="Services",
-                        support_revocation=False,
-                    )
-                )
-            LOGGER.info(
-                "OK CREDENTIAL DEFINITION saved on ledger! %s",
-                credential_definition_id,
-            )
-            service.ledger_credential_definition_id = credential_definition_id
-            await service.save(context)
-
-        except (LedgerError, IssuerError, BadLedgerRequestError) as err:
-            LOGGER.error(
-                "CREDENTIAL DEFINITION failed to create on ledger! %s", err,
-            )
-            issue.state = LEDGER_ERROR
-            await confirmer.send_confirmation(LEDGER_ERROR)
-            return web.json_response(issue.serialize())
-    else:
-        LOGGER.info(
-            "OK CREDENTIAL DEFINITION already exists for this service! %s",
-            service.ledger_credential_definition_id,
+    except (LedgerError, IssuerError, BadLedgerRequestError) as err:
+        LOGGER.error(
+            "credential offer creation error! %s", err,
         )
-
-    # NOTE(Krzosa): Create credential offer
-    credential_exchange_record, credential_offer_message = await _create_free_offer(
-        context,
-        service.ledger_credential_definition_id,
-        issue.connection_id,
-        True,
-        False,
-        {
-            "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
-            "attributes": [
-                {
-                    "name": "label",
-                    "mime-type": "application/json",
-                    "value": service.label,
-                },
-                {
-                    "name": "consent_schema",
-                    "mime-type": "application/json",
-                    "value": json.dumps(service.consent_schema),
-                },
-                {
-                    "name": "service_schema",
-                    "mime-type": "application/json",
-                    "value": json.dumps(service.service_schema),
-                },
-            ],
-        },
-    )
-    LOGGER.info("OK credential offer created! %s", credential_exchange_record)
+        issue.state = LEDGER_ERROR
+        await confirmer.send_confirmation(LEDGER_ERROR)
+        return web.json_response(issue.serialize())
 
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
@@ -415,7 +496,7 @@ async def get_issue_self(request: web.BaseRequest):
 
         # NOTE(Krzosa): request additional information from the agent
         # that we had this interaction with
-        if record.payload == None:
+        if record["payload"] == None:
             request = GetIssue(exchange_id=i.exchange_id)
             await outbound_handler(request, connection_id=i.connection_id)
 
