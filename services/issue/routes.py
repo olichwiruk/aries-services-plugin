@@ -84,6 +84,11 @@ class ServiceManager:
         self.service: ServiceRecord = service
 
     async def init_context(self, context):
+        """
+        this needs to be split from __init__ because init cant be asynchronous
+        thats why this class is created with create_service_manager which 
+        creates an object and call init_context
+        """
         self.context = context
         self.ledger: BaseLedger = await context.inject(BaseLedger)
         self.issuer: BaseIssuer = await context.inject(BaseIssuer)
@@ -100,7 +105,7 @@ class ServiceManager:
                         self.issuer,
                         self.service.label,
                         "1.0",
-                        ["consent_schema", "service_schema", "label"],
+                        ["data_dri", "service_schema", "label"],
                     )
                 )
                 LOGGER.info("OK Schema saved on ledger! %s", schema_id)
@@ -281,7 +286,6 @@ async def apply(request: web.BaseRequest):
         services: ServiceDiscoveryRecord = await ServiceDiscoveryRecord.retrieve_by_connection_id(
             context, params["connection_id"]
         )
-        print(services)
         # NOTE(Krzosa): query for a service with exact service_id
         service = None
         for query in services.services:
@@ -371,12 +375,13 @@ async def apply(request: web.BaseRequest):
             credential_definition_id=credential_exchange_record.credential_definition_id,
         )
 
-        await record.save(context)
+        data_dri = await record.save(context)
 
         request = Application(
             service_id=record.service_id,
             exchange_id=record.exchange_id,
             credential_definition_id=credential_exchange_record.credential_definition_id,
+            data_dri=data_dri,
         )
         await outbound_handler(request, connection_id=params["connection_id"])
         return web.json_response(request.serialize())
@@ -454,7 +459,13 @@ async def process_application(request: web.BaseRequest):
         outbound_handler, issue.connection_id, issue.exchange_id
     )
 
-    if params["decision"] == "reject":
+    #
+    # NOTE(KKrzosa): Validate the state of the issue and
+    #                check if credential is correct
+    # TODO(KKrzosa): inform about invalid credential
+    #
+
+    if params["decision"] == "reject" or issue.state == REJECTED:
         issue.state = REJECTED
         await confirmer.send_confirmation(REJECTED)
         return web.json_response(issue.serialize())
@@ -498,10 +509,14 @@ async def process_application(request: web.BaseRequest):
     if found_credential == None:
         raise web.HTTPNotFound(reason="Credential for consent not found")
 
-    print("CREDENTIAL MEMES")
+    print("CREDENTIAL INFO: \n")
     print(credential)
     print(credential_list)
-    print("\n\n\n\n\n")
+
+    #
+    # NOTE(KKrzosa): Create a schema and credential def but only if they dont exist
+    #                 and based on those issue a credential
+    #
 
     service_manager: ServiceManager = await create_service_manager(context, service)
 
@@ -522,9 +537,9 @@ async def process_application(request: web.BaseRequest):
                         "value": service.label,
                     },
                     {
-                        "name": "consent_schema",
+                        "name": "data_dri",
                         "mime-type": "application/json",
-                        "value": json.dumps(service.consent_schema),
+                        "value": issue.issuer_data_dri_cache,
                     },
                     {
                         "name": "service_schema",

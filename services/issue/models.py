@@ -45,6 +45,7 @@ class ServiceIssueRecord(BaseRecord):
         credential_definition_id: str = None,
         consent_schema: ConsentSchema = None,
         service_schema: ServiceSchema = None,
+        issuer_data_dri_cache: str = None,
         #
         exchange_id: str = None,
         record_id: str = None,
@@ -61,6 +62,7 @@ class ServiceIssueRecord(BaseRecord):
         self.consent_schema = consent_schema
         self.service_schema = service_schema
         self.credential_definition_id = credential_definition_id
+        self.issuer_data_dri_cache = issuer_data_dri_cache
 
     @property
     def record_value(self) -> dict:
@@ -78,6 +80,7 @@ class ServiceIssueRecord(BaseRecord):
                 "consent_schema",
                 "service_schema",
                 "credential_definition_id",
+                "issuer_data_dri_cache",
             )
         }
 

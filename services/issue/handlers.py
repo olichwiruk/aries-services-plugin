@@ -69,6 +69,7 @@ class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
+        print("APPLICATION HANDLER", context.message)
         LOGGER.info("Application Handler %s", context.message)
         assert isinstance(context.message, Application)
 
@@ -92,6 +93,7 @@ class ApplicationHandler(BaseHandler):
             exchange_id=context.message.exchange_id,
             service_id=context.message.service_id,
             credential_definition_id=context.message.credential_definition_id,
+            issuer_data_dri_cache=context.message.data_dri,
             service_schema=service.service_schema,
             consent_schema=service.consent_schema,
             label=service.label,

@@ -30,6 +30,7 @@ Application, ApplicationSchema = generate_model_schema(
         "service_id": fields.Str(required=True),
         "exchange_id": fields.Str(required=True),
         "credential_definition_id": fields.Str(required=True),
+        "data_dri": fields.Str(required=True),
     },
 )
 
