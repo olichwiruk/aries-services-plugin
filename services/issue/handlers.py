@@ -91,6 +91,7 @@ class ApplicationHandler(BaseHandler):
             connection_id=context.connection_record.connection_id,
             exchange_id=context.message.exchange_id,
             service_id=context.message.service_id,
+            credential_definition_id=context.message.credential_definition_id,
             service_schema=service.service_schema,
             consent_schema=service.consent_schema,
             label=service.label,

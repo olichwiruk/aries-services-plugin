@@ -42,6 +42,7 @@ class ServiceIssueRecord(BaseRecord):
         # Holder / (cred requester) values
         label: str = None,
         payload: str = None,
+        credential_definition_id: str = None,
         consent_schema: ConsentSchema = None,
         service_schema: ServiceSchema = None,
         #
@@ -59,6 +60,7 @@ class ServiceIssueRecord(BaseRecord):
         self.payload = payload
         self.consent_schema = consent_schema
         self.service_schema = service_schema
+        self.credential_definition_id = credential_definition_id
 
     @property
     def record_value(self) -> dict:
@@ -75,6 +77,7 @@ class ServiceIssueRecord(BaseRecord):
                 "payload",
                 "consent_schema",
                 "service_schema",
+                "credential_definition_id",
             )
         }
 
