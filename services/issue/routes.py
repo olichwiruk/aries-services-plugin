@@ -271,7 +271,12 @@ async def _create_free_offer(
 
 @docs(
     tags=["Verifiable Services"],
-    summary="Apply to a service that connected agent provides, you need a service_id that you can get from service discovery request list",
+    summary="Apply to a service that connected agent provides",
+    description="""
+    You need a "service_id", you can get it by calling some other agent with
+    "request_services_list"(you need to have a already established connection
+    with another agent and connection_id of that connection)
+    """,
 )
 @request_schema(ApplySchema())
 async def apply(request: web.BaseRequest):
@@ -296,6 +301,11 @@ async def apply(request: web.BaseRequest):
             raise StorageNotFoundError
     except StorageNotFoundError:
         raise web.HTTPNotFound
+
+    #
+    # NOTE(KKrzosa): Send a credential offer for consent to the other agent
+    # TODO(KKrzosa): Cache the credential definition
+    #
 
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
@@ -390,7 +400,18 @@ async def apply(request: web.BaseRequest):
 
 
 @docs(
-    tags=["Verifiable Services"], summary="Get the issue state",
+    tags=["Verifiable Services"],
+    summary="Get state of a service issue",
+    description="""
+    You can filter issues by: 
+        service_id
+        connection_id 
+        exchange_id (id of a group of issue messages)
+
+    This returns a list, you can exclude a filter just by not including it
+    so if you dont want to search by exchange_id make sure to only include:
+        {"connection_id": "123", "service_id": "1234"}
+    """,
 )
 @request_schema(ApplyStatusSchema())
 async def apply_status(request: web.BaseRequest):
@@ -557,7 +578,7 @@ async def process_application(request: web.BaseRequest):
         )
         issue.state = LEDGER_ERROR
         await confirmer.send_confirmation(LEDGER_ERROR)
-        return web.json_response(issue.serialize())
+        raise web.HTTPError(reason="Ledger error, credential offer creation error")
 
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
