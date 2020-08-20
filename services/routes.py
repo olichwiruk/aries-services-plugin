@@ -19,6 +19,11 @@ async def register(app: web.Application):
                 "/verifiable-services/apply-status", apply_status, allow_head=False,
             ),
             web.get(
+                "/verifiable-services/get-credential-data/{data_dri}",
+                get_credential_data,
+                allow_head=False,
+            ),
+            web.get(
                 "/verifiable-services/request/{connection_id}",
                 request_services_list,
                 allow_head=False,

@@ -58,6 +58,10 @@ class ApplyStatusSchema(Schema):
     exchange_id = fields.Str(required=False)
 
 
+class GetCredentialDataSchema(Schema):
+    data_dri = fields.Str(required=False)
+
+
 class GetIssueSchema(Schema):
     exchange_id = fields.Str(required=False)
     connection_id = fields.Str(required=False)
@@ -426,6 +430,21 @@ async def apply_status(request: web.BaseRequest):
     query = [i.serialize() for i in query]
 
     return web.json_response(query)
+
+
+@docs(tags=["Verifiable Services"],)
+async def get_credential_data(request: web.BaseRequest):
+    context = request.app["request_context"]
+    data_dri = request.match_info["data_dri"]
+
+    try:
+        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+            context, data_dri
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    return web.json_response({"credential_data": query.payload})
 
 
 class ProcessApplicationSchema(Schema):
