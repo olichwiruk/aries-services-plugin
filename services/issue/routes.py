@@ -109,7 +109,7 @@ class ServiceManager:
                         self.issuer,
                         self.service.label,
                         "1.0",
-                        ["data_dri", "service_schema", "label"],
+                        ["data_dri", "oca_schema_dri", "oca_schema_namespace"],
                     )
                 )
                 LOGGER.info("OK Schema saved on ledger! %s", schema_id)
@@ -572,9 +572,9 @@ async def process_application(request: web.BaseRequest):
                 "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
                 "attributes": [
                     {
-                        "name": "label",
+                        "name": "oca_schema_dri",
                         "mime-type": "application/json",
-                        "value": service.label,
+                        "value": service.service_schema["oca_schema_dri"],
                     },
                     {
                         "name": "data_dri",
@@ -582,9 +582,9 @@ async def process_application(request: web.BaseRequest):
                         "value": issue.issuer_data_dri_cache,
                     },
                     {
-                        "name": "service_schema",
+                        "name": "oca_schema_namespace",
                         "mime-type": "application/json",
-                        "value": json.dumps(service.service_schema),
+                        "value": service.service_schema["oca_schema_namespace"],
                     },
                 ],
             },
