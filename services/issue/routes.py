@@ -52,6 +52,7 @@ class GetIssueSchema(Schema):
 class GetIssueSelfSchema(Schema):
     issue_id = fields.Str(required=False)
     connection_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
     service_id = fields.Str(required=False)
     label = fields.Str(required=False)
     author = fields.Str(required=False)
@@ -169,50 +170,6 @@ async def apply(request: web.BaseRequest):
     raise web.HTTPBadGateway
 
 
-@docs(
-    tags=["Verifiable Services"],
-    summary="Get state of a service issue",
-    description="""
-    You can filter issues by: 
-        service_id
-        connection_id 
-        exchange_id (id of a group of issue messages)
-
-    This returns a list, you can exclude a filter just by not including it
-    so if you dont want to search by exchange_id make sure to only include:
-        {"connection_id": "123", "service_id": "1234"}
-    """,
-)
-@request_schema(ApplyStatusSchema())
-async def apply_status(request: web.BaseRequest):
-    context = request.app["request_context"]
-    params = await request.json()
-
-    try:
-        query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    query = [i.serialize() for i in query]
-
-    return web.json_response(query)
-
-
-@docs(tags=["Verifiable Services"],)
-async def get_credential_data(request: web.BaseRequest):
-    context = request.app["request_context"]
-    data_dri = request.match_info["data_dri"]
-
-    try:
-        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
-            context, data_dri
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    return web.json_response({"credential_data": query.payload})
-
-
 class ProcessApplicationSchema(Schema):
     issue_id = fields.Str(required=True)
     decision = fields.Str(required=True)
@@ -273,6 +230,8 @@ async def process_application(request: web.BaseRequest):
 
     if params["decision"] == "reject" or issue.state == REJECTED:
         issue.state = REJECTED
+        issue.save()
+        confirmer.send_confirmation(REJECTED)
         return web.json_response(issue.serialize())
 
     holder: BaseHolder = await context.inject(BaseHolder)
@@ -378,6 +337,9 @@ async def process_application(request: web.BaseRequest):
     You don't need to fill any of this, all the filters are optional
     make sure to delete ones you dont use
 
+    IMPORTANT: when issue_id is passed, all other fields are IGNORED!
+    issue_id == data_dri
+
     STATES: 
     "pending" - not processed yet (not rejected or accepted)
     "no response" - agent didn't respond at all yet
@@ -394,6 +356,7 @@ async def process_application(request: web.BaseRequest):
     This endpoint under the hood calls all the agents that we have 
     uncomplete information about and requests the uncomplete information (payload)
     that information can be retrieved on the next call to get-issue-self
+
     """,
 )
 @request_schema(GetIssueSelfSchema())
@@ -402,10 +365,19 @@ async def get_issue_self(request: web.BaseRequest):
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
 
-    try:
-        query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    # TODO: Under the hood payload change notification
+    if params["issue_id"] != None:
+        try:
+            query = [
+                await ServiceIssueRecord.retrieve_by_id(context, params["issue_id"])
+            ]
+        except StorageNotFoundError:
+            raise web.HTTPNotFound
+    else:
+        try:
+            query = await ServiceIssueRecord.query(context, tag_filter=params)
+        except StorageNotFoundError:
+            raise web.HTTPNotFound
 
     result = []
     for i in query:
@@ -430,3 +402,46 @@ async def get_issue_self(request: web.BaseRequest):
             await outbound_handler(request, connection_id=i.connection_id)
 
     return web.json_response(result)
+
+
+# @docs(
+#     tags=["Verifiable Services"],
+#     summary="Get state of a service issue",
+#     description="""
+#     You can filter issues by:
+#         service_id
+#         connection_id
+#         exchange_id (id of a group of issue messages)
+
+#     This returns a list, you can exclude a filter just by not including it
+#     so if you dont want to search by exchange_id make sure to only include:
+#         {"connection_id": "123", "service_id": "1234"}
+#     """,
+# )
+@request_schema(ApplyStatusSchema())
+async def DEBUGapply_status(request: web.BaseRequest):
+    context = request.app["request_context"]
+    params = await request.json()
+
+    try:
+        query = await ServiceIssueRecord.query(context, tag_filter=params)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    query = [i.serialize() for i in query]
+
+    return web.json_response(query)
+
+
+async def DEBUGget_credential_data(request: web.BaseRequest):
+    context = request.app["request_context"]
+    data_dri = request.match_info["data_dri"]
+
+    try:
+        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+            context, data_dri
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    return web.json_response({"credential_data": query.payload})

@@ -15,21 +15,8 @@ async def register(app: web.Application):
             web.post("/verifiable-services/get-issue-self", get_issue_self,),
             web.post("/verifiable-services/process-application", process_application,),
             web.get(
-                "/verifiable-services/apply-status", apply_status, allow_head=False,
-            ),
-            web.get(
-                "/verifiable-services/get-credential-data/{data_dri}",
-                get_credential_data,
-                allow_head=False,
-            ),
-            web.get(
                 "/verifiable-services/request-service-list/{connection_id}",
                 request_services_list,
-                allow_head=False,
-            ),
-            web.get(
-                "/verifiable-services/DEBUGrequest/{connection_id}",
-                DEBUGrequest_services_list,
                 allow_head=False,
             ),
             web.get(
@@ -37,5 +24,20 @@ async def register(app: web.Application):
                 self_service_list,
                 allow_head=False,
             ),
+            web.get(
+                "/verifiable-services/DEBUGrequest/{connection_id}",
+                DEBUGrequest_services_list,
+                allow_head=False,
+            ),
+            # web.get(
+            #     "/verifiable-services/get-credential-data/{data_dri}",
+            #     DEBUGget_credential_data,
+            #     allow_head=False,
+            # ),
+            # web.get(
+            #     "/verifiable-services/apply-status",
+            #     DEBUGapply_status,
+            #     allow_head=False,
+            # ),
         ]
     )
