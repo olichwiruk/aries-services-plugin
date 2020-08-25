@@ -10,7 +10,7 @@ from unittest import mock, TestCase
 import datetime
 import json
 
-from ..discovery import *
+from ..handlers import *
 
 from ...discovery.message_types import *
 

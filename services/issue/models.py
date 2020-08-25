@@ -10,8 +10,7 @@ from typing import Mapping, Any
 import uuid
 import json
 
-from ..discovery.models import ConsentSchema, ServiceSchema
-from ..util import assert_items_are_not_none
+from ..models import ConsentSchema, ServiceSchema
 
 
 class ServiceIssueRecord(BaseRecord):

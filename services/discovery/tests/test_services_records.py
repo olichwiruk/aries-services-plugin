@@ -10,7 +10,7 @@ from unittest import mock, TestCase
 import datetime
 import json
 
-from ..models import *
+from ...models import *
 
 
 class TestServiceRecord(AsyncTestCase):

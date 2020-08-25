@@ -1,6 +1,6 @@
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
 
-PROTOCOL_PACKAGE = "services.discovery.discovery"
+PROTOCOL_PACKAGE = "services.discovery.handlers"
 
 DISCOVERY = f"{PROTOCOL_URI}/discovery"
 DISCOVERY_RESPONSE = f"{PROTOCOL_URI}/discovery-response"
@@ -17,7 +17,7 @@ MESSAGE_TYPES = {
 # Messages
 from ..util import generate_model_schema
 from marshmallow import Schema, fields
-from .models import ServiceSchema, ConsentSchema
+from ..models import ServiceSchema, ConsentSchema
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 
 Discovery, DiscoverySchema = generate_model_schema(

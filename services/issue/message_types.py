@@ -1,7 +1,7 @@
 from ..util import generate_model_schema
 from marshmallow import Schema, fields
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
-from ..discovery.models import ConsentSchema, ServiceSchema
+from ..models import ConsentSchema, ServiceSchema
 
 # Message Types
 PROTOCOL_URI = "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/verifiable-services/1.0"
@@ -11,13 +11,13 @@ PROTOCOL_PACKAGE = "services.issue.handlers"
 APPLICATION = f"{PROTOCOL_URI}/application"
 CONFIRMATION = f"{PROTOCOL_URI}/confirmation"
 GET_ISSUE = f"{PROTOCOL_URI}/get-issue"
-RECEIVE_ISSUE = f"{PROTOCOL_URI}/receive-issue"
+GET_ISSUE_RESPONSE = f"{PROTOCOL_URI}/get-issue-response"
 
 MESSAGE_TYPES = {
     APPLICATION: f"{PROTOCOL_PACKAGE}.Application",
     CONFIRMATION: f"{PROTOCOL_PACKAGE}.Confirmation",
     GET_ISSUE: f"{PROTOCOL_PACKAGE}.GetIssue",
-    RECEIVE_ISSUE: f"{PROTOCOL_PACKAGE}.ReceiveIssue",
+    GET_ISSUE_RESPONSE: f"{PROTOCOL_PACKAGE}.GetIssueResponse",
 }
 
 
@@ -51,10 +51,10 @@ GetIssue, GetIssueSchema = generate_model_schema(
     schema={"exchange_id": fields.Str(required=True),},
 )
 
-ReceiveIssue, ReceiveIssueSchema = generate_model_schema(
-    name="ReceiveIssue",
-    handler=f"{PROTOCOL_PACKAGE}.ReceiveIssueHandler",
-    msg_type=RECEIVE_ISSUE,
+GetIssueResponse, GetIssueResponseSchema = generate_model_schema(
+    name="GetIssueResponse",
+    handler=f"{PROTOCOL_PACKAGE}.GetIssueResponseHandler",
+    msg_type=GET_ISSUE_RESPONSE,
     schema={
         "label": fields.Str(required=False),
         "payload": fields.Str(required=False),

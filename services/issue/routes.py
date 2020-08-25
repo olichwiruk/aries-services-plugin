@@ -39,7 +39,7 @@ from asyncio import shield
 
 from .models import *
 from .message_types import *
-from ..discovery.models import *
+from ..models import *
 from ..discovery.message_types import DiscoveryServiceSchema
 
 LOGGER = logging.getLogger(__name__)
@@ -276,9 +276,10 @@ async def _create_free_offer(
     tags=["Verifiable Services"],
     summary="Apply to a service that connected agent provides",
     description="""
-    You need a "service_id", you can get it by calling some other agent with
-    "request_services_list"(you need to have a already established connection
-    with another agent and connection_id of that connection)
+    "connection_id" - id of a already established connection with some other agent.
+    "service" - you can get that by requesting a list of services from a already
+    connected agent.
+    "payload" - your data.
     """,
 )
 @request_schema(ApplySchema())
@@ -309,31 +310,37 @@ async def apply(request: web.BaseRequest):
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
-    async with ledger:
-        schema_id, schema_definition = await shield(
-            ledger.create_and_send_schema(
-                issuer,
-                "consent_schema",
-                "1.0",
-                ["oca_schema_dri", "oca_schema_namespace", "data_url"],
+    try:
+        async with ledger:
+            schema_id, schema_definition = await shield(
+                ledger.create_and_send_schema(
+                    issuer,
+                    "consent_schema",
+                    "1.0",
+                    ["oca_schema_dri", "oca_schema_namespace", "data_url"],
+                )
             )
-        )
-        LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
+            LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
 
-    async with ledger:
-        credential_definition_id, credential_definition = await shield(
-            ledger.create_and_send_credential_definition(
-                issuer,
-                schema_id,
-                signature_type=None,
-                tag="consent_schema",
-                support_revocation=False,
+        async with ledger:
+            credential_definition_id, credential_definition = await shield(
+                ledger.create_and_send_credential_definition(
+                    issuer,
+                    schema_id,
+                    signature_type=None,
+                    tag="consent_schema",
+                    support_revocation=False,
+                )
             )
+            LOGGER.info(
+                "OK consent_schema CREDENTIAL DEFINITION saved on ledger! %s",
+                credential_definition_id,
+            )
+    except (LedgerError, IssuerError, BadLedgerRequestError) as err:
+        LOGGER.error(
+            "credential offer creation error! %s", err,
         )
-        LOGGER.info(
-            "OK consent_schema CREDENTIAL DEFINITION saved on ledger! %s",
-            credential_definition_id,
-        )
+        raise web.HTTPError(reason="Ledger error, credential offer creation error")
 
     credential_exchange_record, credential_offer_message = await _create_free_offer(
         context,
@@ -362,9 +369,6 @@ async def apply(request: web.BaseRequest):
             ],
         },
     )
-
-    print("credential_exhcagne record", credential_exchange_record)
-    print("MESSAGE CRED", credential_offer_message)
 
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
@@ -501,13 +505,13 @@ async def process_application(request: web.BaseRequest):
         issue.state = REJECTED
         return web.json_response(issue.serialize())
 
-    # NOTE(KKrzosa): Search for a consent credential
     holder: BaseHolder = await context.inject(BaseHolder)
 
     service_namespace = service.consent_schema["oca_schema_namespace"]
     service_dri = service.consent_schema["oca_schema_dri"]
     service_data_url = service.consent_schema["data_url"]
 
+    # NOTE(KKrzosa): Search for a consent credential
     iterator = 0
     found_credential = None
     credential_list = None
@@ -539,10 +543,6 @@ async def process_application(request: web.BaseRequest):
 
     if found_credential == None:
         raise web.HTTPNotFound(reason="Credential for consent not found")
-
-    print("CREDENTIAL INFO: \n")
-    print(credential)
-    print(credential_list)
 
     #
     # NOTE(KKrzosa): Create a schema and credential def but only if they dont exist
@@ -660,27 +660,3 @@ async def get_issue_self(request: web.BaseRequest):
             await outbound_handler(request, connection_id=i.connection_id)
 
     return web.json_response(result)
-
-
-@docs(
-    tags=["Verifiable Services"], summary="needs a rework",
-)
-@request_schema(GetIssueSchema())
-async def get_issue(request: web.BaseRequest):
-    context = request.app["request_context"]
-    outbound_handler = request.app["outbound_message_router"]
-    params = await request.json()
-
-    try:
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, params["connection_id"]
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    if connection.is_ready:
-        request = GetIssue(exchange_id=params["exchange_id"])
-        await outbound_handler(request, connection_id=connection.connection_id)
-        return web.json_response(request.serialize())
-
-    raise web.HTTPNotFound

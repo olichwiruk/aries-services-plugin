@@ -19,7 +19,7 @@ from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoun
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
 
 # Internal
-from .models import *
+from ..models import *
 from .message_types import *
 from ..util import generate_model_schema
 
@@ -65,8 +65,63 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         await responder.send_webhook(
-            "service_discovery", {"services": json.dumps(context.message.services)},
+            "verifiable-services", {"services": json.dumps(context.message.services)},
         )
+
+
+"""
+DEBUG
+"""
+
+
+class DEBUGServiceDiscoveryRecord(BaseRecord):
+    RECORD_ID_NAME = "record_id"
+    RECORD_TYPE = "DEBUGservice_discovery"
+
+    class Meta:
+        schema_class = "DEBUGServiceDiscoveryRecordSchema"
+
+    def __init__(
+        self,
+        *,
+        services=None,
+        connection_id: str = None,
+        state: str = None,
+        record_id: str = None,
+        **keywordArgs,
+    ):
+        super().__init__(record_id, state, **keywordArgs)
+        self.services = services
+        self.connection_id = connection_id
+
+    @property
+    def record_value(self) -> dict:
+        """Accessor to for the JSON record value properties"""
+        return {prop: getattr(self, prop) for prop in ("services", "connection_id")}
+
+    @property
+    def record_tags(self) -> dict:
+        """Get tags for record, 
+            NOTE: relevent when filtering by tags"""
+        return {
+            "connection_id": self.connection_id,
+        }
+
+    @classmethod
+    async def retrieve_by_connection_id(
+        cls, context: InjectionContext, connection_id: str
+    ):
+        return await cls.retrieve_by_tag_filter(
+            context, {"connection_id": connection_id},
+        )
+
+
+class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
+    class Meta:
+        model_class = "DEBUGServiceDiscoveryRecord"
+
+    services = fields.List(fields.Nested(ServiceRecordSchema()))
+    connection_id = fields.Str()
 
 
 class DEBUGDiscoveryHandler(BaseHandler):

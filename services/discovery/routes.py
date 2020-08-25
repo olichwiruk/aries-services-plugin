@@ -13,8 +13,9 @@ import time
 from typing import Sequence
 
 # Internal
-from .models import *
+from ..models import *
 from .message_types import *
+from .handlers import *
 
 
 class AddServiceSchema(Schema):
