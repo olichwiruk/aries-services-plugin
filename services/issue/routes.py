@@ -37,19 +37,18 @@ import json
 from typing import Sequence
 from asyncio import shield
 
-from .message_types import Application
+from .models import *
+from .message_types import *
 from ..discovery.models import *
-from .models import ServiceIssueRecord
-from ..issue.message_types import *
-from .handlers import send_confirmation
+from ..discovery.message_types import DiscoveryServiceSchema
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ApplySchema(Schema):
-    service_id = fields.Str(required=True)
     connection_id = fields.Str(required=True)
     payload = fields.Str(required=True)
+    service = fields.Nested(DiscoveryServiceSchema())
 
 
 class ApplyStatusSchema(Schema):
@@ -288,24 +287,20 @@ async def apply(request: web.BaseRequest):
     params = await request.json()
     outbound_handler = request.app["outbound_message_router"]
 
+    connection_id = params["connection_id"]
+    payload = params["payload"]
+
+    service_id = params["service"]["service_id"]
+    consent_schema = params["service"]["consent_schema"]
+    service_schema = params["service"]["service_schema"]
+    label = params["service"]["label"]
+
     try:
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, params["connection_id"]
+            context, connection_id
         )
-        services: ServiceDiscoveryRecord = await ServiceDiscoveryRecord.retrieve_by_connection_id(
-            context, params["connection_id"]
-        )
-        # NOTE(Krzosa): query for a service with exact service_id
-        service = None
-        for query in services.services:
-            if query["service_id"] == params["service_id"]:
-                service = query
-                break
-        if service == None:
-            raise StorageNotFoundError
     except StorageNotFoundError:
-        raise web.HTTPNotFound
-
+        raise web.HTTPNotFound(reason="Connection not found")
     #
     # NOTE(KKrzosa): Send a credential offer for consent to the other agent
     # TODO(KKrzosa): Cache the credential definition
@@ -340,11 +335,10 @@ async def apply(request: web.BaseRequest):
             credential_definition_id,
         )
 
-    print(service)
     credential_exchange_record, credential_offer_message = await _create_free_offer(
         context,
         credential_definition_id,
-        params["connection_id"],
+        connection_id,
         True,
         True,
         {
@@ -353,17 +347,17 @@ async def apply(request: web.BaseRequest):
                 {
                     "name": "oca_schema_dri",
                     "mime-type": "application/json",
-                    "value": service["consent_schema"]["oca_schema_dri"],
+                    "value": consent_schema["oca_schema_dri"],
                 },
                 {
                     "name": "oca_schema_namespace",
                     "mime-type": "application/json",
-                    "value": service["consent_schema"]["oca_schema_namespace"],
+                    "value": consent_schema["oca_schema_namespace"],
                 },
                 {
                     "name": "data_url",
                     "mime-type": "application/json",
-                    "value": service["consent_schema"]["data_url"],
+                    "value": consent_schema["data_url"],
                 },
             ],
         },
@@ -373,19 +367,17 @@ async def apply(request: web.BaseRequest):
     print("MESSAGE CRED", credential_offer_message)
 
     if connection.is_ready:
-        await outbound_handler(
-            credential_offer_message, connection_id=params["connection_id"]
-        )
+        await outbound_handler(credential_offer_message, connection_id=connection_id)
 
         record = ServiceIssueRecord(
-            connection_id=params["connection_id"],
+            connection_id=connection_id,
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
             author=ServiceIssueRecord.AUTHOR_SELF,
-            service_id=service["service_id"],
-            label=service["label"],
-            consent_schema=service["consent_schema"],
-            service_schema=service["service_schema"],
-            payload=params["payload"],
+            service_id=service_id,
+            label=label,
+            consent_schema=consent_schema,
+            service_schema=service_schema,
+            payload=payload,
             credential_definition_id=credential_exchange_record.credential_definition_id,
         )
 
@@ -397,7 +389,7 @@ async def apply(request: web.BaseRequest):
             credential_definition_id=credential_exchange_record.credential_definition_id,
             data_dri=data_dri,
         )
-        await outbound_handler(request, connection_id=params["connection_id"])
+        await outbound_handler(request, connection_id=connection_id)
         return web.json_response(request.serialize())
 
     raise web.HTTPBadGateway
@@ -507,7 +499,6 @@ async def process_application(request: web.BaseRequest):
 
     if params["decision"] == "reject" or issue.state == REJECTED:
         issue.state = REJECTED
-        await confirmer.send_confirmation(REJECTED)
         return web.json_response(issue.serialize())
 
     # NOTE(KKrzosa): Search for a consent credential
@@ -596,14 +587,12 @@ async def process_application(request: web.BaseRequest):
             "credential offer creation error! %s", err,
         )
         issue.state = LEDGER_ERROR
-        await confirmer.send_confirmation(LEDGER_ERROR)
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
 
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
 
     await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
-    await confirmer.send_confirmation(ACCEPTED)
     return web.json_response(
         {
             "issue": issue.serialize(),
