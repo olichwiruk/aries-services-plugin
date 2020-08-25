@@ -83,12 +83,12 @@ class ServiceRecordSchema(BaseRecordSchema):
     ledger_credential_definition_id = (fields.Str(required=False),)
 
 
-class ServiceDiscoveryRecord(BaseRecord):
+class DEBUGServiceDiscoveryRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
-    RECORD_TYPE = "service_discovery"
+    RECORD_TYPE = "DEBUGservice_discovery"
 
     class Meta:
-        schema_class = "ServiceDiscoveryRecordSchema"
+        schema_class = "DEBUGServiceDiscoveryRecordSchema"
 
     def __init__(
         self,
@@ -125,9 +125,9 @@ class ServiceDiscoveryRecord(BaseRecord):
         )
 
 
-class ServiceDiscoveryRecordSchema(BaseRecordSchema):
+class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
     class Meta:
-        model_class = "ServiceDiscoveryRecord"
+        model_class = "DEBUGServiceDiscoveryRecord"
 
     services = fields.List(fields.Nested(ServiceRecordSchema()))
     connection_id = fields.Str()

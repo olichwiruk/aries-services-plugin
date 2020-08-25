@@ -53,11 +53,6 @@ class TestDiscovery(AsyncTestCase):
         handler = DiscoveryResponseHandler()
         await handler.handle(context, responder)
 
-        services = await ServiceDiscoveryRecord().query(context)
-        assert len(services) == 1
-        assert services[0].connection_id == self.connection_id
-        assert services[0].services == [self.service]
-
     async def test_discovery_handler(self):
         context = RequestContext()
         storage = BasicStorage()

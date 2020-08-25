@@ -24,13 +24,13 @@ async def register(app: web.Application):
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/request/{connection_id}",
+                "/verifiable-services/request-services-list/{connection_id}",
                 request_services_list,
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/fetch-list/{connection_id}",
-                fetch_services,
+                "/verifiable-services/DEBUGrequest/{connection_id}",
+                DEBUGrequest_services_list,
                 allow_head=False,
             ),
             web.get(
