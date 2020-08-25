@@ -23,7 +23,7 @@ async def register(app: web.Application):
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/request-services-list/{connection_id}",
+                "/verifiable-services/request-service-list/{connection_id}",
                 request_services_list,
                 allow_head=False,
             ),
@@ -33,8 +33,8 @@ async def register(app: web.Application):
                 allow_head=False,
             ),
             web.get(
-                "/verifiable-services/fetch-self",
-                fetch_services_self,
+                "/verifiable-services/self-service-list",
+                self_service_list,
                 allow_head=False,
             ),
         ]

@@ -72,7 +72,7 @@ async def request_services_list(request: web.BaseRequest):
 @docs(
     tags=["Service Discovery"], summary="Get a list of all services I registered",
 )
-async def fetch_services_self(request: web.BaseRequest):
+async def self_service_list(request: web.BaseRequest):
     context = request.app["request_context"]
 
     try:

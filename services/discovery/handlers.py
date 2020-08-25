@@ -65,7 +65,8 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         await responder.send_webhook(
-            "verifiable-services", {"services": json.dumps(context.message.services)},
+            "verifiable-services/request-service-list",
+            {"services": json.dumps(context.message.services)},
         )
 
 

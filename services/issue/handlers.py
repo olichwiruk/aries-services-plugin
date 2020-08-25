@@ -5,39 +5,11 @@ from aries_cloudagent.messaging.base_handler import (
     RequestContext,
 )
 from aries_cloudagent.storage.base import BaseStorage
-from aries_cloudagent.config.injection_context import InjectionContext
-from aries_cloudagent.core.plugin_registry import PluginRegistry
-from aries_cloudagent.ledger.base import BaseLedger
-from aries_cloudagent.issuer.base import BaseIssuer
-from aries_cloudagent.protocols.issue_credential.v1_0.manager import CredentialManager
-from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
-
-
-# Records, messages and schemas
-from aries_cloudagent.connections.models.connection_record import ConnectionRecord
-from aries_cloudagent.storage.record import StorageRecord
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_proposal import (
-    CredentialProposal,
-)
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_offer import (
-    CredentialOfferSchema,
-)
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.inner.credential_preview import (
-    CredentialPreview,
-    CredentialPreviewSchema,
-)
-from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
-from aries_cloudagent.protocols.issue_credential.v1_0.models.credential_exchange import (
-    V10CredentialExchange,
-    V10CredentialExchangeSchema,
-)
 
 # Exceptions
-from aries_cloudagent.ledger.error import LedgerError
-from aries_cloudagent.ledger.error import BadLedgerRequestError
-from aries_cloudagent.issuer.base import IssuerError
 from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoundError
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
+
 
 # Internal
 from ..util import generate_model_schema
@@ -109,7 +81,10 @@ class ApplicationHandler(BaseHandler):
 
         await responder.send_webhook(
             "verifiable-services",
-            {"ServiceIssueRecord": issue.serialize(), "issue_id": issue_id},
+            {
+                "ServiceIssueRecord/pending-application": issue.serialize(),
+                "issue_id": issue_id,
+            },
         )
 
 
@@ -134,7 +109,7 @@ class ConfirmationHandler(BaseHandler):
         record_id = await record.save(context, reason="Updated issue state")
 
         await responder.send_webhook(
-            "verifiable-services",
+            "verifiable-services/issue-state-update",
             {"state": record.state, "issue_id": record_id, "issue": record.serialize()},
         )
 
