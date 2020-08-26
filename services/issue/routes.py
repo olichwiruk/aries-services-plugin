@@ -59,6 +59,11 @@ class GetIssueSelfSchema(Schema):
     state = fields.Str(required=False)
 
 
+class ProcessApplicationSchema(Schema):
+    issue_id = fields.Str(required=True)
+    decision = fields.Str(required=True)
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Apply to a service that connected agent provides",
@@ -98,6 +103,7 @@ async def apply(request: web.BaseRequest):
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
     try:
+        # NOTE: Register Schema on LEDGER
         async with ledger:
             schema_id, schema_definition = await shield(
                 ledger.create_and_send_schema(
@@ -109,6 +115,7 @@ async def apply(request: web.BaseRequest):
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
 
+        # NOTE: Register Credential DEFINITION on LEDGER
         async with ledger:
             credential_definition_id, credential_definition = await shield(
                 ledger.create_and_send_credential_definition(
@@ -123,23 +130,24 @@ async def apply(request: web.BaseRequest):
                 "OK consent_schema CREDENTIAL DEFINITION saved on ledger! %s",
                 credential_definition_id,
             )
+
+        # NOTE: Create credential OFFER
+        (
+            credential_exchange_record,
+            credential_offer_message,
+        ) = await create_consent_credential_offer(
+            context=context,
+            cred_def_id=credential_definition_id,
+            connection_id=connection_id,
+            consent_schema=consent_schema,
+            auto_issue=True,
+            auto_remove=True,
+        )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
             "credential offer creation error! %s", err,
         )
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
-
-    (
-        credential_exchange_record,
-        credential_offer_message,
-    ) = await create_consent_credential_offer(
-        context=context,
-        cred_def_id=credential_definition_id,
-        connection_id=connection_id,
-        consent_schema=consent_schema,
-        auto_issue=True,
-        auto_remove=True,
-    )
 
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
@@ -168,11 +176,6 @@ async def apply(request: web.BaseRequest):
         return web.json_response(request.serialize())
 
     raise web.HTTPBadGateway
-
-
-class ProcessApplicationSchema(Schema):
-    issue_id = fields.Str(required=True)
-    decision = fields.Str(required=True)
 
 
 # TODO: Connection record, connection ready
@@ -230,8 +233,8 @@ async def process_application(request: web.BaseRequest):
 
     if params["decision"] == "reject" or issue.state == REJECTED:
         issue.state = REJECTED
-        issue.save()
-        confirmer.send_confirmation(REJECTED)
+        issue.save(context, reason="Issue reject saved")
+        confirmer.send_confirmation(issue.state)
         return web.json_response(issue.serialize())
 
     holder: BaseHolder = await context.inject(BaseHolder)
@@ -366,7 +369,8 @@ async def get_issue_self(request: web.BaseRequest):
     params = await request.json()
 
     # TODO: Under the hood payload change notification
-    if params["issue_id"] != None:
+    # ERROR:
+    if "issue_id" in params and params["issue_id"] != None:
         try:
             query = [
                 await ServiceIssueRecord.retrieve_by_id(context, params["issue_id"])
@@ -404,20 +408,20 @@ async def get_issue_self(request: web.BaseRequest):
     return web.json_response(result)
 
 
-# @docs(
-#     tags=["Verifiable Services"],
-#     summary="Get state of a service issue",
-#     description="""
-#     You can filter issues by:
-#         service_id
-#         connection_id
-#         exchange_id (id of a group of issue messages)
+@docs(
+    tags=["Verifiable Services"],
+    summary="Get state of a service issue",
+    description="""
+    You can filter issues by:
+        service_id
+        connection_id
+        exchange_id (id of a group of issue messages)
 
-#     This returns a list, you can exclude a filter just by not including it
-#     so if you dont want to search by exchange_id make sure to only include:
-#         {"connection_id": "123", "service_id": "1234"}
-#     """,
-# )
+    This returns a list, you can exclude a filter just by not including it
+    so if you dont want to search by exchange_id make sure to only include:
+        {"connection_id": "123", "service_id": "1234"}
+    """,
+)
 @request_schema(ApplyStatusSchema())
 async def DEBUGapply_status(request: web.BaseRequest):
     context = request.app["request_context"]

@@ -80,11 +80,8 @@ class ApplicationHandler(BaseHandler):
         )
 
         await responder.send_webhook(
-            "verifiable-services",
-            {
-                "ServiceIssueRecord/pending-application": issue.serialize(),
-                "issue_id": issue_id,
-            },
+            "verifiable-services/incoming-pending-application",
+            {"issue": issue.serialize(), "issue_id": issue_id,},
         )
 
 
@@ -149,7 +146,7 @@ class GetIssueResponseHandler(BaseHandler):
         assert isinstance(context.message, GetIssueResponse)
 
         try:
-            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+            issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
                 context,
                 context.message.exchange_id,
                 context.connection_record.connection_id,
@@ -158,13 +155,18 @@ class GetIssueResponseHandler(BaseHandler):
             LOGGER.error("GetIssueResponseHandler error %s", err)
             return
 
-        if record.label == None:
-            record.label = context.message.label
-        if record.payload == None:
-            record.payload = context.message.payload
-        if record.service_schema == None:
-            record.service_schema = json.loads(context.message.service_schema)
-        if record.consent_schema == None:
-            record.consent_schema = json.loads(context.message.consent_schema)
-        await record.save(context)
+        if issue.label == None:
+            issue.label = context.message.label
+        if issue.payload == None:
+            issue.payload = context.message.payload
+        if issue.service_schema == None:
+            issue.service_schema = json.loads(context.message.service_schema)
+        if issue.consent_schema == None:
+            issue.consent_schema = json.loads(context.message.consent_schema)
+        issue_id = await issue.save(context)
+
+        await responder.send_webhook(
+            "verifiable-services/get-issue",
+            {"issue_id": issue_id, "issue": issue.serialize()},
+        )
 

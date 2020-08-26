@@ -42,7 +42,8 @@ from .credentials import *
 
 class ServiceManager:
     """
-    Create instance of this class with create_service_manager function
+    Create instance of this class with create_service_manager function like so:
+    service_manager: ServiceManager = await create_service_manager(context, service)
 
     errors from functions should be handled with this
     except (IssuerError, LedgerError, BadLedgerRequestError) as err:
