@@ -13,12 +13,7 @@ import time
 from typing import Sequence
 
 # Internal
-from .models import (
-    ServiceRecord,
-    ConsentSchema,
-    ServiceSchema,
-    ServiceDiscoveryRecord,
-)
+from .models import *
 from .message_types import Discovery
 
 
@@ -39,6 +34,24 @@ async def add_service(request: web.BaseRequest):
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
     )
+
+    # Search for the consent in DataVault and make sure that it exists
+    async with ClientSession() as session:
+        async with session.get(
+            DATA_VAULT + params["consent_schema"]["data_url"]
+        ) as response:
+            text: str = await response.text()
+            if response.status != 200 or text == None:
+                raise web.HTTPNotFound(reason="Consent not found")
+
+            text = json.loads(text)
+            print(text)
+            if (
+                "expiration" not in text
+                or "limitation" not in text
+                or "validityTTL" not in text
+            ):
+                raise web.HTTPNotFound(reason="Consent, unfamiliar format")
 
     try:
         hash_id = await service_record.save(context)

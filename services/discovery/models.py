@@ -12,6 +12,15 @@ import json
 
 from ..util import assert_items_are_not_none
 
+DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
+
+
+class ConsentContentSchema(Schema):
+    expiration = fields.Str(required=True)
+    limitation = fields.Str(required=True)
+    dictatedBy = fields.Str(required=True)
+    validityTTL = fields.Str(required=True)
+
 
 class ConsentSchema(Schema):
     # dri - decentralized resource identifier
