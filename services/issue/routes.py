@@ -234,7 +234,7 @@ async def process_application(request: web.BaseRequest):
     if params["decision"] == "reject" or issue.state == REJECTED:
         issue.state = REJECTED
         issue.save(context, reason="Issue reject saved")
-        confirmer.send_confirmation(issue.state)
+        await confirmer.send_confirmation(issue.state)
         return web.json_response(issue.serialize())
 
     holder: BaseHolder = await context.inject(BaseHolder)

@@ -4,6 +4,7 @@ from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicat
 from aries_cloudagent.storage.base import BaseStorage
 
 from aiohttp import web
+from aiohttp import ClientSession
 from aiohttp_apispec import docs, request_schema
 
 from marshmallow import fields, Schema
@@ -16,6 +17,21 @@ from typing import Sequence
 from ..models import *
 from .message_types import *
 from .handlers import *
+
+DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
+CONSENT_EXAMPLE = {
+    "expiration": "3600",
+    "limitation": "3600",
+    "dictatedBy": "somebody",
+    "validityTTL": "3600",
+}
+
+
+class ConsentContentSchema(Schema):
+    expiration = fields.Str(required=True)
+    limitation = fields.Str(required=True)
+    dictatedBy = fields.Str(required=True)
+    validityTTL = fields.Str(required=True)
 
 
 class AddServiceSchema(Schema):
@@ -35,6 +51,24 @@ async def add_service(request: web.BaseRequest):
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
     )
+
+    # Search for the consent in DataVault and make sure that it exists
+    async with ClientSession() as session:
+        async with session.get(
+            DATA_VAULT + params["consent_schema"]["data_url"]
+        ) as response:
+            text: str = await response.text()
+            if response.status != 200 or text == None:
+                raise web.HTTPNotFound(reason="Consent not found")
+
+            text = json.loads(text)
+            print(text)
+            if (
+                "expiration" not in text
+                or "limitation" not in text
+                or "validityTTL" not in text
+            ):
+                raise web.HTTPNotFound(reason="Consent, unfamiliar format")
 
     try:
         hash_id = await service_record.save(context)
@@ -90,8 +124,6 @@ async def self_service_list(request: web.BaseRequest):
 
 
 async def DEBUGrequest_services_list(request: web.BaseRequest):
-    # TODO: check for times so that we wont get the cached service list or delete record
-    # Should this perhaps be left as is or maybe I should force check if things changed
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
     outbound_handler = request.app["outbound_message_router"]

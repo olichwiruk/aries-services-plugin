@@ -39,6 +39,8 @@ from .message_types import *
 from ..models import *
 from .credentials import *
 
+LOGGER = logging.getLogger(__name__)
+
 
 class ServiceManager:
     """
