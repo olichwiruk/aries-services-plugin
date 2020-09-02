@@ -120,7 +120,7 @@ async def self_service_list(request: web.BaseRequest):
         service_json.update({"service_id": service._id})
         result.append(service_json)
 
-    return web.json_response(query)
+    return web.json_response(result)
 
 
 async def DEBUGrequest_services_list(request: web.BaseRequest):
