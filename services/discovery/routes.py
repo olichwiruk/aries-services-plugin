@@ -4,6 +4,7 @@ from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicat
 from aries_cloudagent.storage.base import BaseStorage
 
 from aiohttp import web
+from aiohttp import ClientSession
 from aiohttp_apispec import docs, request_schema
 
 from marshmallow import fields, Schema
@@ -13,8 +14,29 @@ import time
 from typing import Sequence
 
 # Internal
+<<<<<<< HEAD
 from .models import *
 from .message_types import Discovery
+=======
+from ..models import *
+from .message_types import *
+from .handlers import *
+
+DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
+CONSENT_EXAMPLE = {
+    "expiration": "3600",
+    "limitation": "3600",
+    "dictatedBy": "somebody",
+    "validityTTL": "3600",
+}
+
+
+class ConsentContentSchema(Schema):
+    expiration = fields.Str(required=True)
+    limitation = fields.Str(required=True)
+    dictatedBy = fields.Str(required=True)
+    validityTTL = fields.Str(required=True)
+>>>>>>> 8e7f9fbc3a68e9448f1a0970173f97b65ffa024b
 
 
 class AddServiceSchema(Schema):
@@ -63,11 +85,50 @@ async def add_service(request: web.BaseRequest):
 
 @docs(
     tags=["Service Discovery"],
-    summary="Request a list of services from another agent and save them to storage, fetch services with fetch endpoint",
+    summary="Request a list of services from another agent",
+    description="Reading the list requires webhook handling",
 )
 async def request_services_list(request: web.BaseRequest):
-    # TODO: check for times so that we wont get the cached service list or delete record
-    # Should this perhaps be left as is or maybe I should force check if things changed
+    context = request.app["request_context"]
+    connection_id = request.match_info["connection_id"]
+    outbound_handler = request.app["outbound_message_router"]
+
+    try:
+        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
+            context, connection_id
+        )
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    if connection.is_ready:
+        request = Discovery()
+        await outbound_handler(request, connection_id=connection_id)
+        return web.json_response("SUCCESS: request sent, expect a webhook notification")
+
+    raise web.HTTPNotFound
+
+
+@docs(
+    tags=["Service Discovery"], summary="Get a list of all services I registered",
+)
+async def self_service_list(request: web.BaseRequest):
+    context = request.app["request_context"]
+
+    try:
+        query = await ServiceRecord().query(context)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    result = []
+    for service in query:
+        service_json = service.serialize()
+        service_json.update({"service_id": service._id})
+        result.append(service_json)
+
+    return web.json_response(result)
+
+
+async def DEBUGrequest_services_list(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
     outbound_handler = request.app["outbound_message_router"]
@@ -82,7 +143,7 @@ async def request_services_list(request: web.BaseRequest):
     if connection.is_ready:
         # First we request service list from second agent
         # It has to go through a different route
-        request = Discovery()
+        request = DEBUGDiscovery()
         await outbound_handler(request, connection_id=connection_id)
 
         # So here sleep is used to query records in a loop
@@ -90,7 +151,7 @@ async def request_services_list(request: web.BaseRequest):
         max_retries = 8
         for i in range(max_retries):
             try:
-                query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
+                query: DEBUGServiceDiscoveryRecord = await DEBUGServiceDiscoveryRecord().retrieve_by_connection_id(
                     context, connection_id
                 )
                 return web.json_response(query.serialize())
@@ -100,37 +161,3 @@ async def request_services_list(request: web.BaseRequest):
             time.sleep(1)
 
     raise web.HTTPNotFound
-
-
-@docs(
-    tags=["Service Discovery"],
-    summary="Get the saved list of services from another agent, needs to be requested first / needs to be stored already",
-)
-async def fetch_services(request: web.BaseRequest):
-    context = request.app["request_context"]
-    connection_id = request.match_info["connection_id"]
-
-    try:
-        query: ServiceDiscoveryRecord = await ServiceDiscoveryRecord().retrieve_by_connection_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    return web.json_response(query.serialize())
-
-
-@docs(
-    tags=["Service Discovery"], summary="Get a list of all services I registered",
-)
-async def fetch_services_self(request: web.BaseRequest):
-    context = request.app["request_context"]
-
-    try:
-        query = await ServiceRecord().query(context)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
-
-    query = [i.serialize() for i in query]
-
-    return web.json_response(query)

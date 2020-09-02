@@ -10,7 +10,7 @@ from unittest import mock, TestCase
 import datetime
 import json
 
-from ..discovery import *
+from ..handlers import *
 
 from ...discovery.message_types import *
 
@@ -52,11 +52,6 @@ class TestDiscovery(AsyncTestCase):
 
         handler = DiscoveryResponseHandler()
         await handler.handle(context, responder)
-
-        services = await ServiceDiscoveryRecord().query(context)
-        assert len(services) == 1
-        assert services[0].connection_id == self.connection_id
-        assert services[0].services == [self.service]
 
     async def test_discovery_handler(self):
         context = RequestContext()

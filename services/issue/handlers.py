@@ -5,45 +5,17 @@ from aries_cloudagent.messaging.base_handler import (
     RequestContext,
 )
 from aries_cloudagent.storage.base import BaseStorage
-from aries_cloudagent.config.injection_context import InjectionContext
-from aries_cloudagent.core.plugin_registry import PluginRegistry
-from aries_cloudagent.ledger.base import BaseLedger
-from aries_cloudagent.issuer.base import BaseIssuer
-from aries_cloudagent.protocols.issue_credential.v1_0.manager import CredentialManager
-from aries_cloudagent.protocols.connections.v1_0.manager import ConnectionManager
-
-
-# Records, messages and schemas
-from aries_cloudagent.connections.models.connection_record import ConnectionRecord
-from aries_cloudagent.storage.record import StorageRecord
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_proposal import (
-    CredentialProposal,
-)
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.credential_offer import (
-    CredentialOfferSchema,
-)
-from aries_cloudagent.protocols.issue_credential.v1_0.messages.inner.credential_preview import (
-    CredentialPreview,
-    CredentialPreviewSchema,
-)
-from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
-from aries_cloudagent.protocols.issue_credential.v1_0.models.credential_exchange import (
-    V10CredentialExchange,
-    V10CredentialExchangeSchema,
-)
 
 # Exceptions
-from aries_cloudagent.ledger.error import LedgerError
-from aries_cloudagent.ledger.error import BadLedgerRequestError
-from aries_cloudagent.issuer.base import IssuerError
 from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoundError
 from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
+
 
 # Internal
 from ..util import generate_model_schema
 from .message_types import *
 from .models import ServiceIssueRecord
-from ..discovery.models import ServiceRecord
+from ..models import ServiceRecord
 
 # External
 from asyncio import shield
@@ -69,12 +41,11 @@ class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        print("APPLICATION HANDLER", context.message)
         LOGGER.info("Application Handler %s", context.message)
         assert isinstance(context.message, Application)
 
         try:
-            service: ServiceRecord = await ServiceRecord().retrieve_by_id(
+            service: ServiceRecord = await ServiceRecord.retrieve_by_id(
                 context, context.message.service_id
             )
         except StorageNotFoundError:
@@ -86,7 +57,7 @@ class ApplicationHandler(BaseHandler):
             )
             return
 
-        record = ServiceIssueRecord(
+        issue = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
             connection_id=context.connection_record.connection_id,
@@ -99,12 +70,18 @@ class ApplicationHandler(BaseHandler):
             label=service.label,
         )
 
-        await record.save(context)
+        issue_id = await issue.save(context)
+
         await send_confirmation(
             context,
             responder,
             context.message.exchange_id,
             ServiceIssueRecord.ISSUE_PENDING,
+        )
+
+        await responder.send_webhook(
+            "verifiable-services/incoming-pending-application",
+            {"issue": issue.serialize(), "issue_id": issue_id,},
         )
 
 
@@ -116,7 +93,7 @@ class ConfirmationHandler(BaseHandler):
         assert isinstance(context.message, Confirmation)
 
         try:
-            record = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
                 context,
                 context.message.exchange_id,
                 context.connection_record.connection_id,
@@ -126,7 +103,12 @@ class ConfirmationHandler(BaseHandler):
             return
 
         record.state = context.message.state
-        await record.save(context, reason="Updated issue state")
+        record_id = await record.save(context, reason="Updated issue state")
+
+        await responder.send_webhook(
+            "verifiable-services/issue-state-update",
+            {"state": record.state, "issue_id": record_id, "issue": record.serialize()},
+        )
 
 
 class GetIssueHandler(BaseHandler):
@@ -134,7 +116,6 @@ class GetIssueHandler(BaseHandler):
         storage: BaseStorage = await context.inject(BaseStorage)
 
         LOGGER.info("OK GetIssueHandler received %s", context.message)
-        print("OK GetIssueHandler", context.message)
         assert isinstance(context.message, GetIssue)
 
         try:
@@ -147,7 +128,7 @@ class GetIssueHandler(BaseHandler):
             LOGGER.error("GetIssueHandler error %s", err)
             return
 
-        response = ReceiveIssue(
+        response = GetIssueResponse(
             label=record.label,
             payload=record.payload,
             service_schema=json.dumps(record.service_schema),
@@ -159,28 +140,33 @@ class GetIssueHandler(BaseHandler):
         await responder.send_reply(response)
 
 
-class ReceiveIssueHandler(BaseHandler):
+class GetIssueResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        print("OK ReceiveIssueHandler received")
-        assert isinstance(context.message, ReceiveIssue)
+        print("OK GetIssueResponseHandler received")
+        assert isinstance(context.message, GetIssueResponse)
 
         try:
-            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+            issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
                 context,
                 context.message.exchange_id,
                 context.connection_record.connection_id,
             )
         except StorageNotFoundError as err:
-            LOGGER.error("ReceiveIssueHandler error %s", err)
+            LOGGER.error("GetIssueResponseHandler error %s", err)
             return
 
-        if record.label == None:
-            record.label = context.message.label
-        if record.payload == None:
-            record.payload = context.message.payload
-        if record.service_schema == None:
-            record.service_schema = json.loads(context.message.service_schema)
-        if record.consent_schema == None:
-            record.consent_schema = json.loads(context.message.consent_schema)
-        await record.save(context)
+        if issue.label == None:
+            issue.label = context.message.label
+        if issue.payload == None:
+            issue.payload = context.message.payload
+        if issue.service_schema == None:
+            issue.service_schema = json.loads(context.message.service_schema)
+        if issue.consent_schema == None:
+            issue.consent_schema = json.loads(context.message.consent_schema)
+        issue_id = await issue.save(context)
+
+        await responder.send_webhook(
+            "verifiable-services/get-issue",
+            {"issue_id": issue_id, "issue": issue.serialize()},
+        )
 
