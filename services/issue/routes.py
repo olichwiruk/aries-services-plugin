@@ -115,15 +115,12 @@ async def apply(request: web.BaseRequest):
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
 
+        # TODO: Error here with unpacking it returns a dict now
         # NOTE: Register Credential DEFINITION on LEDGER
         async with ledger:
             credential_definition_id, credential_definition = await shield(
                 ledger.create_and_send_credential_definition(
-                    issuer,
-                    schema_id,
-                    signature_type=None,
-                    tag="consent_schema",
-                    support_revocation=False,
+                    issuer, schema_id, signature_type=None, tag="consent_schema",
                 )
             )
             LOGGER.info(

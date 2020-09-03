@@ -14,13 +14,15 @@ import time
 from typing import Sequence
 
 # Internal
-<<<<<<< HEAD
-from .models import *
-from .message_types import Discovery
-=======
 from ..models import *
 from .message_types import *
 from .handlers import *
+
+# debug
+
+from aries_cloudagent.wallet.base import BaseWallet
+from aries_cloudagent.wallet.http import HttpWallet
+from aries_cloudagent.wallet.basic import BasicWallet
 
 DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
 CONSENT_EXAMPLE = {
@@ -36,7 +38,6 @@ class ConsentContentSchema(Schema):
     limitation = fields.Str(required=True)
     dictatedBy = fields.Str(required=True)
     validityTTL = fields.Str(required=True)
->>>>>>> 8e7f9fbc3a68e9448f1a0970173f97b65ffa024b
 
 
 class AddServiceSchema(Schema):
@@ -51,6 +52,15 @@ async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
+    # context.settings.set_value("wallet.type", "http")
+    # wallet = HttpWallet()
+
+    # context.injector.bind_instance(BaseWallet, wallet)
+    # wallet: BaseWallet = await context.inject(BaseWallet)
+    # print(context.settings)
+
+    # wallet.open()
+
     service_record = ServiceRecord(
         label=params["label"],
         service_schema=params["service_schema"],
@@ -58,22 +68,22 @@ async def add_service(request: web.BaseRequest):
     )
 
     # Search for the consent in DataVault and make sure that it exists
-    async with ClientSession() as session:
-        async with session.get(
-            DATA_VAULT + params["consent_schema"]["data_url"]
-        ) as response:
-            text: str = await response.text()
-            if response.status != 200 or text == None:
-                raise web.HTTPNotFound(reason="Consent not found")
+    # async with ClientSession() as session:
+    #     async with session.get(
+    #         DATA_VAULT + params["consent_schema"]["data_url"]
+    #     ) as response:
+    #         text: str = await response.text()
+    #         if response.status != 200 or text == None:
+    #             raise web.HTTPNotFound(reason="Consent not found")
 
-            text = json.loads(text)
-            print(text)
-            if (
-                "expiration" not in text
-                or "limitation" not in text
-                or "validityTTL" not in text
-            ):
-                raise web.HTTPNotFound(reason="Consent, unfamiliar format")
+    #         text = json.loads(text)
+    #         print(text)
+    #         if (
+    #             "expiration" not in text
+    #             or "limitation" not in text
+    #             or "validityTTL" not in text
+    #         ):
+    #             raise web.HTTPNotFound(reason="Consent, unfamiliar format")
 
     try:
         hash_id = await service_record.save(context)
