@@ -20,17 +20,17 @@ from .handlers import *
 
 # debug
 
-from aries_cloudagent.wallet.base import BaseWallet
-from aries_cloudagent.wallet.http import HttpWallet
-from aries_cloudagent.wallet.basic import BasicWallet
+# from aries_cloudagent.wallet.base import BaseWallet
+# from aries_cloudagent.wallet.http import HttpWallet
+# from aries_cloudagent.wallet.basic import BasicWallet
 
-DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
-CONSENT_EXAMPLE = {
-    "expiration": "3600",
-    "limitation": "3600",
-    "dictatedBy": "somebody",
-    "validityTTL": "3600",
-}
+# DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
+# CONSENT_EXAMPLE = {
+#     "expiration": "3600",
+#     "limitation": "3600",
+#     "dictatedBy": "somebody",
+#     "validityTTL": "3600",
+# }
 
 
 class ConsentContentSchema(Schema):
