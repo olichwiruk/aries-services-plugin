@@ -204,6 +204,7 @@ async def process_application(request: web.BaseRequest):
     outbound_handler = request.app["outbound_message_router"]
     context = request.app["request_context"]
     params = await request.json()
+
     REJECTED = ServiceIssueRecord.ISSUE_REJECTED
     LEDGER_ERROR = ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR
     ACCEPTED = ServiceIssueRecord.ISSUE_ACCEPTED
@@ -321,6 +322,7 @@ async def process_application(request: web.BaseRequest):
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
 
+    await confirmer.send_confirmation(issue.state)
     await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
     return web.json_response(
         {
