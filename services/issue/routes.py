@@ -24,6 +24,7 @@ from .message_types import *
 from ..models import *
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
+from aries_cloudagent.holder.thcf_model import THCFCredential
 
 LOGGER = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ async def apply(request: web.BaseRequest):
         # TODO: Error here with unpacking it returns a dict now
         # NOTE: Register Credential DEFINITION on LEDGER
         async with ledger:
-            credential_definition_id, credential_definition = await shield(
+            credential_definition_id, credential_definition, novel = await shield(
                 ledger.create_and_send_credential_definition(
                     issuer, schema_id, signature_type=None, tag="consent_schema",
                 )
@@ -187,6 +188,40 @@ class StatusConfirmer:
         await self.outbound_handler(confirmation, connection_id=self.connection_id)
 
 
+async def DEBUGfind_credential(
+    credential_definition_id, service_dri, service_data_url, service_namespace
+):
+    # NOTE(KKrzosa): Search for a consent credential
+    iterator = 0
+    found_credential = None
+    credential_list = None
+    while credential_list != []:
+        credential_list = await holder.get_credentials(
+            iterator, iterator + 100, {"cred_def_id": credential_definition_id},
+        )
+
+        # NOTE(Krzosa): search through queried credentials chunk for the credential that
+        # matches the service credential
+        break_the_outer_loop = False
+        for credential in credential_list:
+            if (
+                credential["attrs"]["data_url"] == service_data_url
+                and credential["attrs"]["oca_schema_namespace"] == service_namespace
+                and credential["attrs"]["oca_schema_dri"] == service_dri
+            ):
+                found_credential = credential
+
+                # NOTE(KKrzosa): break inner and outer loop
+                break_the_outer_loop = True
+                break
+
+        # NOTE(KKrzosa): if the record got found -> break the while loop
+        if break_the_outer_loop:
+            break
+
+        iterator += 100
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Decide whether application should be accepted or rejected",
@@ -235,41 +270,22 @@ async def process_application(request: web.BaseRequest):
         await confirmer.send_confirmation(issue.state)
         return web.json_response(issue.serialize())
 
-    holder: BaseHolder = await context.inject(BaseHolder)
-
     service_namespace = service.consent_schema["oca_schema_namespace"]
     service_dri = service.consent_schema["oca_schema_dri"]
     service_data_url = service.consent_schema["data_url"]
 
-    # NOTE(KKrzosa): Search for a consent credential
-    iterator = 0
+    credentials: BaseRecord = await THCFCredential.query(context)
+
+    # TODO: Optimize
     found_credential = None
-    credential_list = None
-    while credential_list != []:
-        credential_list = await holder.get_credentials(
-            iterator, iterator + 100, {"cred_def_id": issue.credential_definition_id},
-        )
-
-        # NOTE(Krzosa): search through queried credentials chunk for the credential that
-        # matches the service credential
-        break_the_outer_loop = False
-        for credential in credential_list:
-            if (
-                credential["attrs"]["data_url"] == service_data_url
-                and credential["attrs"]["oca_schema_namespace"] == service_namespace
-                and credential["attrs"]["oca_schema_dri"] == service_dri
-            ):
-                found_credential = credential
-
-                # NOTE(KKrzosa): break inner and outer loop
-                break_the_outer_loop = True
-                break
-
-        # NOTE(KKrzosa): if the record got found -> break the while loop
-        if break_the_outer_loop:
+    for cred in credentials:
+        if (
+            cred.credentialSubject["data_url"] == service_data_url
+            and cred.credentialSubject["oca_schema_namespace"] == service_namespace
+            and cred.credentialSubject["oca_schema_dri"] == service_dri
+        ):
+            found_credential = cred
             break
-
-        iterator += 100
 
     if found_credential == None:
         raise web.HTTPNotFound(reason="Credential for consent not found")
@@ -282,8 +298,11 @@ async def process_application(request: web.BaseRequest):
     service_manager: ServiceManager = await create_service_manager(context, service)
 
     try:
+        print("create_schema")
         await service_manager.create_schema()
+        print("create_credential_definition")
         await service_manager.create_credential_definition()
+        print("create_credential_offer")
         (
             credential_exchange_record,
             credential_offer_message,
@@ -312,6 +331,7 @@ async def process_application(request: web.BaseRequest):
             auto_issue=True,
             auto_remove=False,
         )
+        print("after cred offer")
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
             "credential offer creation error! %s", err,
@@ -322,7 +342,9 @@ async def process_application(request: web.BaseRequest):
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
 
+    print("confirmer.send_confirmation")
     await confirmer.send_confirmation(issue.state)
+    print("outbound_handler")
     await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
     return web.json_response(
         {

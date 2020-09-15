@@ -101,7 +101,7 @@ class ServiceManager:
             and self.service.ledger_credential_definition_id == None
         ):
             async with self.ledger:
-                credential_definition_id, credential_definition = await shield(
+                credential_definition_id, credential_definition, novel = await shield(
                     self.ledger.create_and_send_credential_definition(
                         self.issuer,
                         self.service.ledger_schema_id,
