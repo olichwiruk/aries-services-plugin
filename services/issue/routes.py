@@ -298,11 +298,8 @@ async def process_application(request: web.BaseRequest):
     service_manager: ServiceManager = await create_service_manager(context, service)
 
     try:
-        print("create_schema")
         await service_manager.create_schema()
-        print("create_credential_definition")
         await service_manager.create_credential_definition()
-        print("create_credential_offer")
         (
             credential_exchange_record,
             credential_offer_message,
@@ -331,7 +328,6 @@ async def process_application(request: web.BaseRequest):
             auto_issue=True,
             auto_remove=False,
         )
-        print("after cred offer")
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
             "credential offer creation error! %s", err,
@@ -342,9 +338,7 @@ async def process_application(request: web.BaseRequest):
     issue.state = ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
 
-    print("confirmer.send_confirmation")
     await confirmer.send_confirmation(issue.state)
-    print("outbound_handler")
     await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
     return web.json_response(
         {
