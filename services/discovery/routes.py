@@ -70,7 +70,7 @@ async def add_service(request: web.BaseRequest):
     # Search for the consent in DataVault and make sure that it exists
     # async with ClientSession() as session:
     #     async with session.get(
-    #         DATA_VAULT + params["consent_schema"]["data_url"]
+    #         DATA_VAULT + params["consent_schema"]["data_dri"]
     #     ) as response:
     #         text: str = await response.text()
     #         if response.status != 200 or text == None:
@@ -138,10 +138,14 @@ async def self_service_list(request: web.BaseRequest):
     return web.json_response(result)
 
 
+@docs(
+    tags=["Service Discovery"], summary="DEBU*GGGG",
+)
 async def DEBUGrequest_services_list(request: web.BaseRequest):
     context = request.app["request_context"]
     connection_id = request.match_info["connection_id"]
     outbound_handler = request.app["outbound_message_router"]
+    print("DEBUGrequest_services_list")
 
     try:
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
@@ -171,3 +175,34 @@ async def DEBUGrequest_services_list(request: web.BaseRequest):
             time.sleep(1)
 
     raise web.HTTPNotFound
+
+
+# {
+#     "proof_request": {
+#         "name": "Proof request",
+#         "version": "1.0",
+#         "nonce": "1234567890",
+#         "requested_attributes": {
+#             "oca_schema_dri": {
+#                 "restrictions": [
+#                     {"cred_def_id": "67NyPikkNX2VZ1kPZtycBB:3:CL:1096:consent_schema"}
+#                 ],
+#                 "name": "oca_schema_dri",
+#             },
+#             "data_dri": {
+#                 "restrictions": [
+#                     {"cred_def_id": "67NyPikkNX2VZ1kPZtycBB:3:CL:1096:consent_schema"}
+#                 ],
+#                 "name": "data_dri",
+#             },
+#             "oca_schema_namespace": {
+#                 "restrictions": [
+#                     {"cred_def_id": "67NyPikkNX2VZ1kPZtycBB:3:CL:1096:consent_schema"}
+#                 ],
+#                 "name": "oca_schema_namespace",
+#             },
+#         },
+#     },
+#     "connection_id": "f0653185-3a15-4e9a-95b0-7b0100727a43",
+# }
+

@@ -110,7 +110,7 @@ async def apply(request: web.BaseRequest):
                     issuer,
                     "consent_schema",
                     "1.0",
-                    ["oca_schema_dri", "oca_schema_namespace", "data_url"],
+                    ["oca_schema_dri", "oca_schema_namespace", "data_dri"],
                 )
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
@@ -118,7 +118,7 @@ async def apply(request: web.BaseRequest):
         # TODO: Error here with unpacking it returns a dict now
         # NOTE: Register Credential DEFINITION on LEDGER
         async with ledger:
-            credential_definition_id, credential_definition = await shield(
+            credential_definition_id, credential_definition, _ = await shield(
                 ledger.create_and_send_credential_definition(
                     issuer, schema_id, signature_type=None, tag="consent_schema",
                 )
@@ -238,7 +238,7 @@ async def process_application(request: web.BaseRequest):
 
     service_namespace = service.consent_schema["oca_schema_namespace"]
     service_dri = service.consent_schema["oca_schema_dri"]
-    service_data_url = service.consent_schema["data_url"]
+    service_data_dri = service.consent_schema["data_dri"]
 
     # NOTE(KKrzosa): Search for a consent credential
     iterator = 0
@@ -254,7 +254,7 @@ async def process_application(request: web.BaseRequest):
         break_the_outer_loop = False
         for credential in credential_list:
             if (
-                credential["attrs"]["data_url"] == service_data_url
+                credential["attrs"]["data_dri"] == service_data_dri
                 and credential["attrs"]["oca_schema_namespace"] == service_namespace
                 and credential["attrs"]["oca_schema_dri"] == service_dri
             ):
