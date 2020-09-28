@@ -111,7 +111,7 @@ async def apply(request: web.BaseRequest):
                     issuer,
                     "consent_schema",
                     "1.0",
-                    ["oca_schema_dri", "oca_schema_namespace", "data_url"],
+                    ["oca_schema_dri", "oca_schema_namespace", "data_dri"],
                 )
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
@@ -139,7 +139,7 @@ async def apply(request: web.BaseRequest):
             connection_id=connection_id,
             consent_schema=consent_schema,
             auto_issue=True,
-            auto_remove=True,
+            auto_remove=False,
         )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
@@ -189,7 +189,7 @@ class StatusConfirmer:
 
 
 async def DEBUGfind_credential(
-    credential_definition_id, service_dri, service_data_url, service_namespace
+    credential_definition_id, service_dri, service_data_dri, service_namespace
 ):
     # NOTE(KKrzosa): Search for a consent credential
     iterator = 0
@@ -205,7 +205,7 @@ async def DEBUGfind_credential(
         break_the_outer_loop = False
         for credential in credential_list:
             if (
-                credential["attrs"]["data_url"] == service_data_url
+                credential["attrs"]["data_dri"] == service_data_dri
                 and credential["attrs"]["oca_schema_namespace"] == service_namespace
                 and credential["attrs"]["oca_schema_dri"] == service_dri
             ):
@@ -272,7 +272,7 @@ async def process_application(request: web.BaseRequest):
 
     service_namespace = service.consent_schema["oca_schema_namespace"]
     service_dri = service.consent_schema["oca_schema_dri"]
-    service_data_url = service.consent_schema["data_url"]
+    service_data_dri = service.consent_schema["data_dri"]
 
     credentials: BaseRecord = await THCFCredential.query(context)
 
@@ -280,7 +280,7 @@ async def process_application(request: web.BaseRequest):
     found_credential = None
     for cred in credentials:
         if (
-            cred.credentialSubject["data_url"] == service_data_url
+            cred.credentialSubject["data_dri"] == service_data_dri
             and cred.credentialSubject["oca_schema_namespace"] == service_namespace
             and cred.credentialSubject["oca_schema_dri"] == service_dri
         ):

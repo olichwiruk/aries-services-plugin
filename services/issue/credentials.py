@@ -214,9 +214,9 @@ async def create_consent_credential_offer(
                 "value": consent_schema["oca_schema_namespace"],
             },
             {
-                "name": "data_url",
+                "name": "data_dri",
                 "mime-type": "application/json",
-                "value": consent_schema["data_url"],
+                "value": consent_schema["data_dri"],
             },
         ],
     }
