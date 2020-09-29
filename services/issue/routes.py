@@ -111,7 +111,12 @@ async def apply(request: web.BaseRequest):
                     issuer,
                     "consent_schema",
                     "1.0",
-                    ["oca_schema_dri", "oca_schema_namespace", "data_dri"],
+                    [
+                        "oca_schema_dri",
+                        "oca_schema_namespace",
+                        "data_dri",
+                        "service_consent_match_id",
+                    ],
                 )
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
@@ -133,6 +138,7 @@ async def apply(request: web.BaseRequest):
         (
             credential_exchange_record,
             credential_offer_message,
+            service_consent_match_id,
         ) = await create_consent_credential_offer(
             context=context,
             cred_def_id=credential_definition_id,
@@ -160,6 +166,7 @@ async def apply(request: web.BaseRequest):
             service_schema=service_schema,
             payload=payload,
             credential_definition_id=credential_exchange_record.credential_definition_id,
+            service_consent_match_id=service_consent_match_id,
         )
 
         data_dri = await record.save(context)
@@ -169,6 +176,7 @@ async def apply(request: web.BaseRequest):
             exchange_id=record.exchange_id,
             credential_definition_id=credential_exchange_record.credential_definition_id,
             data_dri=data_dri,
+            service_consent_match_id=service_consent_match_id,
         )
         await outbound_handler(request, connection_id=connection_id)
         return web.json_response(request.serialize())
@@ -283,6 +291,8 @@ async def process_application(request: web.BaseRequest):
             cred.credentialSubject["data_dri"] == service_data_dri
             and cred.credentialSubject["oca_schema_namespace"] == service_namespace
             and cred.credentialSubject["oca_schema_dri"] == service_dri
+            and cred.credentialSubject["service_consent_match_id"]
+            == issue.service_consent_match_id
         ):
             found_credential = cred
             break
@@ -322,6 +332,11 @@ async def process_application(request: web.BaseRequest):
                         "name": "oca_schema_namespace",
                         "mime-type": "application/json",
                         "value": service.service_schema["oca_schema_namespace"],
+                    },
+                    {
+                        "name": "service_consent_match_id",
+                        "mime-type": "application/json",
+                        "value": issue.service_consent_match_id,
                     },
                 ],
             },

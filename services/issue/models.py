@@ -45,6 +45,7 @@ class ServiceIssueRecord(BaseRecord):
         consent_schema: ConsentSchema = None,
         service_schema: ServiceSchema = None,
         issuer_data_dri_cache: str = None,
+        service_consent_match_id: str = None,
         #
         exchange_id: str = None,
         record_id: str = None,
@@ -62,6 +63,7 @@ class ServiceIssueRecord(BaseRecord):
         self.service_schema = service_schema
         self.credential_definition_id = credential_definition_id
         self.issuer_data_dri_cache = issuer_data_dri_cache
+        self.service_consent_match_id = service_consent_match_id
 
     @property
     def record_value(self) -> dict:
@@ -80,6 +82,7 @@ class ServiceIssueRecord(BaseRecord):
                 "service_schema",
                 "credential_definition_id",
                 "issuer_data_dri_cache",
+                "service_consent_match_id",
             )
         }
 
@@ -96,6 +99,7 @@ class ServiceIssueRecord(BaseRecord):
             "connection_id": self.connection_id,
             "exchange_id": self.exchange_id,
             "service_id": self.service_id,
+            "service_consent_match_id": self.service_consent_match_id,
             "state": self.state,
             "author": self.author,
             "label": self.label,
@@ -174,3 +178,4 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     exchange_id = fields.Str(required=False)
     label = fields.Str(required=False)
     service_id = fields.Str(required=False)
+    service_consent_match_id = fields.Str(required=False)
