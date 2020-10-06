@@ -24,7 +24,7 @@ class TestServiceRecord(AsyncTestCase):
         "oca_schema_namespace": "test",
     }
     label = "test_label"
-    payload = "test_payload"
+    payload_dri = "test_payload"
     connection_id = "1234"
     exchange_id = "123456"
     service_id = "12345"
@@ -40,7 +40,7 @@ class TestServiceRecord(AsyncTestCase):
         assert self.consent_schema == record.consent_schema
         assert self.service_schema == record.service_schema
         assert self.service_id == record.service_id
-        assert self.payload == record.payload
+        assert self.payload_dri == record.payload_dri
 
     def create_record(self):
         record = ServiceIssueRecord(
@@ -49,7 +49,7 @@ class TestServiceRecord(AsyncTestCase):
             connection_id=self.connection_id,
             exchange_id=self.exchange_id,
             label=self.label,
-            payload=self.payload,
+            payload_dri=self.payload_dri,
             consent_schema=self.consent_schema,
             service_schema=self.service_schema,
             service_id=self.service_id,
@@ -85,4 +85,3 @@ class TestServiceRecord(AsyncTestCase):
         query = await ServiceIssueRecord.query(context)
         assert len(query) == 1
         self.assert_self_record(query[0])
-

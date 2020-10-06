@@ -14,6 +14,13 @@ from ..models import ConsentSchema, ServiceSchema
 
 
 class ServiceIssueRecord(BaseRecord):
+    """
+    dri - (without oca) identifier pointing to a public storage record in a
+    active data vault
+    oca_dri - it's located in a different repo I think(oca_vault), there are no enpoints
+    for them in the agent, at least I don't think that will work
+    """
+
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "service_issue"
 
@@ -40,7 +47,7 @@ class ServiceIssueRecord(BaseRecord):
         connection_id: str = None,
         # Holder / (cred requester) values
         label: str = None,
-        payload: str = None,
+        payload_dri: str = None,
         credential_definition_id: str = None,
         consent_schema: ConsentSchema = None,
         service_schema: ServiceSchema = None,
@@ -58,7 +65,7 @@ class ServiceIssueRecord(BaseRecord):
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
         # Holder / (cred requester) values
         self.label = label
-        self.payload = payload
+        self.payload_dri = payload_dri
         self.consent_schema = consent_schema
         self.service_schema = service_schema
         self.credential_definition_id = credential_definition_id
@@ -77,7 +84,7 @@ class ServiceIssueRecord(BaseRecord):
                 "exchange_id",
                 "service_id",
                 "label",
-                "payload",
+                "payload_dri",
                 "consent_schema",
                 "service_schema",
                 "credential_definition_id",
@@ -89,12 +96,18 @@ class ServiceIssueRecord(BaseRecord):
     @property
     def unique_record_values(self) -> dict:
         """Hash id of a record is based on those values"""
-        return {prop: getattr(self, prop) for prop in ("connection_id", "exchange_id",)}
+        return {
+            prop: getattr(self, prop)
+            for prop in (
+                "connection_id",
+                "exchange_id",
+            )
+        }
 
     @property
     def record_tags(self) -> dict:
-        """Get tags for record, 
-            NOTE: relevent when filtering by tags"""
+        """Get tags for record,
+        NOTE: relevent when filtering by tags"""
         return {
             "connection_id": self.connection_id,
             "exchange_id": self.exchange_id,
@@ -110,7 +123,8 @@ class ServiceIssueRecord(BaseRecord):
         cls, context: InjectionContext, exchange_id: str, connection_id: str
     ):
         return await cls.retrieve_by_tag_filter(
-            context, {"exchange_id": exchange_id, "connection_id": connection_id},
+            context,
+            {"exchange_id": exchange_id, "connection_id": connection_id},
         )
 
     async def save(

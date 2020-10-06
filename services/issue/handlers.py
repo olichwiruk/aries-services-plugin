@@ -30,7 +30,10 @@ LOGGER = logging.getLogger(__name__)
 
 async def send_confirmation(context, responder, exchange_id, state=None):
     LOGGER.info("send confirmation %s", state)
-    confirmation = Confirmation(exchange_id=exchange_id, state=state,)
+    confirmation = Confirmation(
+        exchange_id=exchange_id,
+        state=state,
+    )
 
     confirmation.assign_thread_from(context.message)
     await responder.send_reply(confirmation)
@@ -82,7 +85,10 @@ class ApplicationHandler(BaseHandler):
 
         await responder.send_webhook(
             "verifiable-services/incoming-pending-application",
-            {"issue": issue.serialize(), "issue_id": issue_id,},
+            {
+                "issue": issue.serialize(),
+                "issue_id": issue_id,
+            },
         )
 
 
@@ -94,10 +100,12 @@ class ConfirmationHandler(BaseHandler):
         assert isinstance(context.message, Confirmation)
 
         try:
-            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                context,
-                context.message.exchange_id,
-                context.connection_record.connection_id,
+            record: ServiceIssueRecord = (
+                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                    context,
+                    context.message.exchange_id,
+                    context.connection_record.connection_id,
+                )
             )
         except StorageNotFoundError as err:
             LOGGER.info("ConfirmationHandler error %s", err)
@@ -120,10 +128,12 @@ class GetIssueHandler(BaseHandler):
         assert isinstance(context.message, GetIssue)
 
         try:
-            record: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                context,
-                context.message.exchange_id,
-                context.connection_record.connection_id,
+            record: ServiceIssueRecord = (
+                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                    context,
+                    context.message.exchange_id,
+                    context.connection_record.connection_id,
+                )
             )
         except StorageNotFoundError as err:
             LOGGER.error("GetIssueHandler error %s", err)
@@ -131,7 +141,7 @@ class GetIssueHandler(BaseHandler):
 
         response = GetIssueResponse(
             label=record.label,
-            payload=record.payload,
+            payload_dri=record.payload_dri,
             service_schema=json.dumps(record.service_schema),
             consent_schema=json.dumps(record.consent_schema),
             exchange_id=record.exchange_id,
@@ -147,10 +157,12 @@ class GetIssueResponseHandler(BaseHandler):
         assert isinstance(context.message, GetIssueResponse)
 
         try:
-            issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                context,
-                context.message.exchange_id,
-                context.connection_record.connection_id,
+            issue: ServiceIssueRecord = (
+                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                    context,
+                    context.message.exchange_id,
+                    context.connection_record.connection_id,
+                )
             )
         except StorageNotFoundError as err:
             LOGGER.error("GetIssueResponseHandler error %s", err)
@@ -158,8 +170,8 @@ class GetIssueResponseHandler(BaseHandler):
 
         if issue.label == None:
             issue.label = context.message.label
-        if issue.payload == None:
-            issue.payload = context.message.payload
+        if issue.payload_dri == None:
+            issue.payload_dri = context.message.payload_dri
         if issue.service_schema == None:
             issue.service_schema = json.loads(context.message.service_schema)
         if issue.consent_schema == None:
@@ -170,4 +182,3 @@ class GetIssueResponseHandler(BaseHandler):
             "verifiable-services/get-issue",
             {"issue_id": issue_id, "issue": issue.serialize()},
         )
-

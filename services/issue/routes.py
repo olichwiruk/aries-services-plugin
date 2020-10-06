@@ -25,6 +25,7 @@ from ..models import *
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.holder.thcf_model import THCFCredential
+from aries_cloudagent.public_data_storage_thcf.base import PublicDataStorage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ async def apply(request: web.BaseRequest):
 
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
+    public_data_storage: PublicDataStorage = await context.inject(PublicDataStorage)
 
     try:
         # NOTE: Register Schema on LEDGER
@@ -126,7 +128,10 @@ async def apply(request: web.BaseRequest):
         async with ledger:
             credential_definition_id, credential_definition, novel = await shield(
                 ledger.create_and_send_credential_definition(
-                    issuer, schema_id, signature_type=None, tag="consent_schema",
+                    issuer,
+                    schema_id,
+                    signature_type=None,
+                    tag="consent_schema",
                 )
             )
             LOGGER.info(
@@ -149,13 +154,15 @@ async def apply(request: web.BaseRequest):
         )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
-            "credential offer creation error! %s", err,
+            "credential offer creation error! %s",
+            err,
         )
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
 
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
 
+        payload_dri = await public_data_storage.save(payload)
         record = ServiceIssueRecord(
             connection_id=connection_id,
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
@@ -164,7 +171,7 @@ async def apply(request: web.BaseRequest):
             label=label,
             consent_schema=consent_schema,
             service_schema=service_schema,
-            payload=payload,
+            payload_dri=payload_dri,
             credential_definition_id=credential_exchange_record.credential_definition_id,
             service_consent_match_id=service_consent_match_id,
         )
@@ -205,7 +212,9 @@ async def DEBUGfind_credential(
     credential_list = None
     while credential_list != []:
         credential_list = await holder.get_credentials(
-            iterator, iterator + 100, {"cred_def_id": credential_definition_id},
+            iterator,
+            iterator + 100,
+            {"cred_def_id": credential_definition_id},
         )
 
         # NOTE(Krzosa): search through queried credentials chunk for the credential that
@@ -345,7 +354,8 @@ async def process_application(request: web.BaseRequest):
         )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
-            "credential offer creation error! %s", err,
+            "credential offer creation error! %s",
+            err,
         )
         issue.state = LEDGER_ERROR
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
@@ -422,7 +432,7 @@ async def get_issue_self(request: web.BaseRequest):
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload": i.payload,
+                "payload_dri": i.payload_dri,
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }
@@ -431,7 +441,7 @@ async def get_issue_self(request: web.BaseRequest):
 
         # NOTE(Krzosa): request additional information from the agent
         # that we had this interaction with
-        if record["payload"] == None:
+        if record["payload_dri"] == None:
             request = GetIssue(exchange_id=i.exchange_id)
             await outbound_handler(request, connection_id=i.connection_id)
 
