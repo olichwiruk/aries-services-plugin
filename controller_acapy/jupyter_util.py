@@ -171,7 +171,7 @@ def connectAgents(connectionAgent1, connectionAgent2):
     message = buildMessage(
         'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/admin-connections/0.1/create-invitation',
         label="ConnectionBetweenAgents",
-        auto_accept='auto',
+        auto_accept="auto",
         alias="agent1ToAgent2"
     )
     createInvitation = sendMessage(message, connectionAgent1)

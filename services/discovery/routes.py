@@ -70,7 +70,7 @@ async def add_service(request: web.BaseRequest):
     # Search for the consent in DataVault and make sure that it exists
     # async with ClientSession() as session:
     #     async with session.get(
-    #         DATA_VAULT + params["consent_schema"]["data_url"]
+    #         DATA_VAULT + params["consent_schema"]["data_dri"]
     #     ) as response:
     #         text: str = await response.text()
     #         if response.status != 200 or text == None:
