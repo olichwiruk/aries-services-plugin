@@ -24,7 +24,7 @@ class TestIssueHandlers(AsyncTestCase):
     consent_schema = {
         "oca_schema_dri": "1234",
         "oca_schema_namespace": "test",
-        "data_url": "http://test.com/test",
+        "data_dri": "http://test.com/test",
     }
     service_schema = {
         "oca_schema_dri": "1234",

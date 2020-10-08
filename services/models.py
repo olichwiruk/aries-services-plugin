@@ -20,14 +20,14 @@ class ConsentContentSchema(Schema):
 
 class ConsentSchema(Schema):
     # dri - decentralized resource identifier
-    oca_schema_dri = fields.Str(required=True)
-    oca_schema_namespace = fields.Str(required=True)
-    data_url = fields.Str(required=True)
+    oca_schema_dri = fields.Str(required=False)
+    oca_schema_namespace = fields.Str(required=False)
+    data_dri = fields.Str(required=False)
 
 
 class ServiceSchema(Schema):
-    oca_schema_dri = fields.Str(required=True)
-    oca_schema_namespace = fields.Str(required=True)
+    oca_schema_dri = fields.Str(required=False)
+    oca_schema_namespace = fields.Str(required=False)
 
 
 class ServiceRecord(BaseRecord):

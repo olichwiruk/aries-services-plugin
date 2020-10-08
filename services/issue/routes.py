@@ -24,6 +24,8 @@ from .message_types import *
 from ..models import *
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
+from aries_cloudagent.holder.thcf_model import THCFCredential
+from aries_cloudagent.public_data_storage_thcf.base import PublicDataStorage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -101,6 +103,7 @@ async def apply(request: web.BaseRequest):
 
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
+    public_data_storage: PublicDataStorage = await context.inject(PublicDataStorage)
 
     try:
         # NOTE: Register Schema on LEDGER
@@ -110,7 +113,12 @@ async def apply(request: web.BaseRequest):
                     issuer,
                     "consent_schema",
                     "1.0",
-                    ["oca_schema_dri", "oca_schema_namespace", "data_url"],
+                    [
+                        "oca_schema_dri",
+                        "oca_schema_namespace",
+                        "data_dri",
+                        "service_consent_match_id",
+                    ],
                 )
             )
             LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
@@ -118,9 +126,12 @@ async def apply(request: web.BaseRequest):
         # TODO: Error here with unpacking it returns a dict now
         # NOTE: Register Credential DEFINITION on LEDGER
         async with ledger:
-            credential_definition_id, credential_definition = await shield(
+            credential_definition_id, credential_definition, novel = await shield(
                 ledger.create_and_send_credential_definition(
-                    issuer, schema_id, signature_type=None, tag="consent_schema",
+                    issuer,
+                    schema_id,
+                    signature_type=None,
+                    tag="consent_schema",
                 )
             )
             LOGGER.info(
@@ -132,23 +143,26 @@ async def apply(request: web.BaseRequest):
         (
             credential_exchange_record,
             credential_offer_message,
+            service_consent_match_id,
         ) = await create_consent_credential_offer(
             context=context,
             cred_def_id=credential_definition_id,
             connection_id=connection_id,
             consent_schema=consent_schema,
             auto_issue=True,
-            auto_remove=True,
+            auto_remove=False,
         )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
-            "credential offer creation error! %s", err,
+            "credential offer creation error! %s",
+            err,
         )
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
 
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
 
+        payload_dri = await public_data_storage.save(payload)
         record = ServiceIssueRecord(
             connection_id=connection_id,
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
@@ -157,8 +171,9 @@ async def apply(request: web.BaseRequest):
             label=label,
             consent_schema=consent_schema,
             service_schema=service_schema,
-            payload=payload,
+            payload_dri=payload_dri,
             credential_definition_id=credential_exchange_record.credential_definition_id,
+            service_consent_match_id=service_consent_match_id,
         )
 
         data_dri = await record.save(context)
@@ -168,6 +183,7 @@ async def apply(request: web.BaseRequest):
             exchange_id=record.exchange_id,
             credential_definition_id=credential_exchange_record.credential_definition_id,
             data_dri=data_dri,
+            service_consent_match_id=service_consent_match_id,
         )
         await outbound_handler(request, connection_id=connection_id)
         return web.json_response(request.serialize())
@@ -185,6 +201,42 @@ class StatusConfirmer:
     async def send_confirmation(self, state):
         confirmation = Confirmation(exchange_id=self.exchange_id, state=state)
         await self.outbound_handler(confirmation, connection_id=self.connection_id)
+
+
+async def DEBUGfind_credential(
+    credential_definition_id, service_dri, service_data_dri, service_namespace
+):
+    # NOTE(KKrzosa): Search for a consent credential
+    iterator = 0
+    found_credential = None
+    credential_list = None
+    while credential_list != []:
+        credential_list = await holder.get_credentials(
+            iterator,
+            iterator + 100,
+            {"cred_def_id": credential_definition_id},
+        )
+
+        # NOTE(Krzosa): search through queried credentials chunk for the credential that
+        # matches the service credential
+        break_the_outer_loop = False
+        for credential in credential_list:
+            if (
+                credential["attrs"]["data_dri"] == service_data_dri
+                and credential["attrs"]["oca_schema_namespace"] == service_namespace
+                and credential["attrs"]["oca_schema_dri"] == service_dri
+            ):
+                found_credential = credential
+
+                # NOTE(KKrzosa): break inner and outer loop
+                break_the_outer_loop = True
+                break
+
+        # NOTE(KKrzosa): if the record got found -> break the while loop
+        if break_the_outer_loop:
+            break
+
+        iterator += 100
 
 
 @docs(
@@ -235,41 +287,24 @@ async def process_application(request: web.BaseRequest):
         await confirmer.send_confirmation(issue.state)
         return web.json_response(issue.serialize())
 
-    holder: BaseHolder = await context.inject(BaseHolder)
-
     service_namespace = service.consent_schema["oca_schema_namespace"]
     service_dri = service.consent_schema["oca_schema_dri"]
-    service_data_url = service.consent_schema["data_url"]
+    service_data_dri = service.consent_schema["data_dri"]
 
-    # NOTE(KKrzosa): Search for a consent credential
-    iterator = 0
+    credentials: BaseRecord = await THCFCredential.query(context)
+
+    # TODO: Optimize
     found_credential = None
-    credential_list = None
-    while credential_list != []:
-        credential_list = await holder.get_credentials(
-            iterator, iterator + 100, {"cred_def_id": issue.credential_definition_id},
-        )
-
-        # NOTE(Krzosa): search through queried credentials chunk for the credential that
-        # matches the service credential
-        break_the_outer_loop = False
-        for credential in credential_list:
-            if (
-                credential["attrs"]["data_url"] == service_data_url
-                and credential["attrs"]["oca_schema_namespace"] == service_namespace
-                and credential["attrs"]["oca_schema_dri"] == service_dri
-            ):
-                found_credential = credential
-
-                # NOTE(KKrzosa): break inner and outer loop
-                break_the_outer_loop = True
-                break
-
-        # NOTE(KKrzosa): if the record got found -> break the while loop
-        if break_the_outer_loop:
+    for cred in credentials:
+        if (
+            cred.credentialSubject["data_dri"] == service_data_dri
+            and cred.credentialSubject["oca_schema_namespace"] == service_namespace
+            and cred.credentialSubject["oca_schema_dri"] == service_dri
+            and cred.credentialSubject["service_consent_match_id"]
+            == issue.service_consent_match_id
+        ):
+            found_credential = cred
             break
-
-        iterator += 100
 
     if found_credential == None:
         raise web.HTTPNotFound(reason="Credential for consent not found")
@@ -307,6 +342,11 @@ async def process_application(request: web.BaseRequest):
                         "mime-type": "application/json",
                         "value": service.service_schema["oca_schema_namespace"],
                     },
+                    {
+                        "name": "service_consent_match_id",
+                        "mime-type": "application/json",
+                        "value": issue.service_consent_match_id,
+                    },
                 ],
             },
             auto_issue=True,
@@ -314,7 +354,8 @@ async def process_application(request: web.BaseRequest):
         )
     except (LedgerError, IssuerError, BadLedgerRequestError) as err:
         LOGGER.error(
-            "credential offer creation error! %s", err,
+            "credential offer creation error! %s",
+            err,
         )
         issue.state = LEDGER_ERROR
         raise web.HTTPError(reason="Ledger error, credential offer creation error")
@@ -391,7 +432,7 @@ async def get_issue_self(request: web.BaseRequest):
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload": i.payload,
+                "payload_dri": i.payload_dri,
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }
@@ -400,7 +441,7 @@ async def get_issue_self(request: web.BaseRequest):
 
         # NOTE(Krzosa): request additional information from the agent
         # that we had this interaction with
-        if record["payload"] == None:
+        if record["payload_dri"] == None:
             request = GetIssue(exchange_id=i.exchange_id)
             await outbound_handler(request, connection_id=i.connection_id)
 

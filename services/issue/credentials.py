@@ -31,6 +31,7 @@ from marshmallow import fields, Schema
 import logging
 import hashlib
 import json
+import uuid
 from typing import Sequence
 from asyncio import shield
 
@@ -76,7 +77,12 @@ class ServiceManager:
                         self.issuer,
                         self.service.label,
                         "1.0",
-                        ["data_dri", "oca_schema_dri", "oca_schema_namespace"],
+                        [
+                            "data_dri",
+                            "oca_schema_dri",
+                            "oca_schema_namespace",
+                            "service_consent_match_id",
+                        ],
                     )
                 )
                 LOGGER.info("OK Schema saved on ledger! %s", schema_id)
@@ -101,7 +107,7 @@ class ServiceManager:
             and self.service.ledger_credential_definition_id == None
         ):
             async with self.ledger:
-                credential_definition_id, credential_definition = await shield(
+                credential_definition_id, credential_definition, novel = await shield(
                     self.ledger.create_and_send_credential_definition(
                         self.issuer,
                         self.service.ledger_schema_id,
@@ -200,6 +206,8 @@ async def create_consent_credential_offer(
 ):
     """Create a credential offer and related exchange record."""
 
+    service_consent_match_id = str(uuid.uuid4())
+
     preview_spec: dict = {
         "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
         "attributes": [
@@ -214,9 +222,14 @@ async def create_consent_credential_offer(
                 "value": consent_schema["oca_schema_namespace"],
             },
             {
-                "name": "data_url",
+                "name": "data_dri",
                 "mime-type": "application/json",
-                "value": consent_schema["data_url"],
+                "value": consent_schema["data_dri"],
+            },
+            {
+                "name": "service_consent_match_id",
+                "mime-type": "application/json",
+                "value": service_consent_match_id,
             },
         ],
     }
@@ -258,4 +271,9 @@ async def create_consent_credential_offer(
         credential_exchange_record, comment=comment
     )
 
-    return credential_exchange_record, credential_offer_message
+    return (
+        credential_exchange_record,
+        credential_offer_message,
+        service_consent_match_id,
+    )
+

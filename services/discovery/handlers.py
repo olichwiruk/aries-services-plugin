@@ -127,9 +127,8 @@ class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
 
 class DEBUGDiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage, )
+        storage: BaseStorage = await context.inject(BaseStorage,)
 
-        print("DEBUG SERVICES DISCOVERY %s, ", context)
         assert isinstance(context.message, DEBUGDiscovery)
 
         query = await ServiceRecord().query(context)
@@ -154,7 +153,6 @@ class DEBUGDiscoveryHandler(BaseHandler):
 
 class DEBUGDiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        print("DEBUG SERVICES DISCOVERY RESPONSE %s, ", context)
         assert isinstance(context.message, DEBUGDiscoveryResponse)
 
         connection_id = context.connection_record.connection_id
