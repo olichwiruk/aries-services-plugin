@@ -25,7 +25,7 @@ from ..models import *
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.holder.thcf_model import THCFCredential
-from aries_cloudagent.public_data_storage_thcf.base import PublicDataStorage
+from aries_cloudagent.pdstorage_thcf.base import BasePersonalDataStorage
 
 LOGGER = logging.getLogger(__name__)
 
@@ -103,7 +103,9 @@ async def apply(request: web.BaseRequest):
 
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
-    public_data_storage: PublicDataStorage = await context.inject(PublicDataStorage)
+    public_data_storage: BasePersonalDataStorage = await context.inject(
+        BasePersonalDataStorage
+    )
 
     try:
         # NOTE: Register Schema on LEDGER
@@ -406,6 +408,7 @@ async def process_application(request: web.BaseRequest):
 async def get_issue_self(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
+    pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
     params = await request.json()
 
     # TODO: Under the hood payload change notification
@@ -426,24 +429,25 @@ async def get_issue_self(request: web.BaseRequest):
     result = []
     for i in query:
         record: dict = i.serialize()
+
+        # NOTE(Krzosa): request additional information from the agent
+        # that we had this interaction with
+        if i.payload_dri == None:
+            request = GetIssue(exchange_id=i.exchange_id)
+            await outbound_handler(request, connection_id=i.connection_id)
+
         # NOTE(Krzosa): serialize additional fields which are not serializable
         # by default
         record.update(
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload_dri": i.payload_dri,
+                "payload": await pds.load(i.payload_dri),
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }
         )
         result.append(record)
-
-        # NOTE(Krzosa): request additional information from the agent
-        # that we had this interaction with
-        if record["payload_dri"] == None:
-            request = GetIssue(exchange_id=i.exchange_id)
-            await outbound_handler(request, connection_id=i.connection_id)
 
     return web.json_response(result)
 

@@ -25,6 +25,8 @@ import hashlib
 import uuid
 import json
 
+from aries_cloudagent.pdstorage_thcf.base import BasePersonalDataStorage
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -122,10 +124,11 @@ class ConfirmationHandler(BaseHandler):
 
 class GetIssueHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
-
         LOGGER.info("OK GetIssueHandler received %s", context.message)
         assert isinstance(context.message, GetIssue)
+
+        storage: BaseStorage = await context.inject(BaseStorage)
+        pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
 
         try:
             record: ServiceIssueRecord = (
@@ -139,9 +142,12 @@ class GetIssueHandler(BaseHandler):
             LOGGER.error("GetIssueHandler error %s", err)
             return
 
+        payload = await pds.load(record.payload_dri)
+        print("payload = await pds.load(i.payload_dri)", payload)
+
         response = GetIssueResponse(
             label=record.label,
-            payload_dri=record.payload_dri,
+            payload=payload,
             service_schema=json.dumps(record.service_schema),
             consent_schema=json.dumps(record.consent_schema),
             exchange_id=record.exchange_id,
@@ -153,8 +159,9 @@ class GetIssueHandler(BaseHandler):
 
 class GetIssueResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        print("OK GetIssueResponseHandler received")
+        print("GetIssueResponseHandler received")
         assert isinstance(context.message, GetIssueResponse)
+        pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
 
         try:
             issue: ServiceIssueRecord = (
@@ -168,10 +175,13 @@ class GetIssueResponseHandler(BaseHandler):
             LOGGER.error("GetIssueResponseHandler error %s", err)
             return
 
+        payload_dri = await pds.save(context.message.payload)
+        print("payload_dri", payload_dri)
+
         if issue.label == None:
             issue.label = context.message.label
         if issue.payload_dri == None:
-            issue.payload_dri = context.message.payload_dri
+            issue.payload_dri = payload_dri
         if issue.service_schema == None:
             issue.service_schema = json.loads(context.message.service_schema)
         if issue.consent_schema == None:
