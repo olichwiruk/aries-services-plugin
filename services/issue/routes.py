@@ -25,7 +25,7 @@ from ..models import *
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.holder.thcf_model import THCFCredential
-from aries_cloudagent.pdstorage_thcf.base import BasePersonalDataStorage
+from aries_cloudagent.pdstorage_thcf.api import *
 
 LOGGER = logging.getLogger(__name__)
 
@@ -103,9 +103,6 @@ async def apply(request: web.BaseRequest):
 
     ledger: BaseLedger = await context.inject(BaseLedger)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
-    public_data_storage: BasePersonalDataStorage = await context.inject(
-        BasePersonalDataStorage
-    )
 
     try:
         # NOTE: Register Schema on LEDGER
@@ -164,7 +161,7 @@ async def apply(request: web.BaseRequest):
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
 
-        payload_dri = await public_data_storage.save(payload)
+        payload_dri = await save_string(context, payload)
         record = ServiceIssueRecord(
             connection_id=connection_id,
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
@@ -408,7 +405,6 @@ async def process_application(request: web.BaseRequest):
 async def get_issue_self(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
-    pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
     params = await request.json()
 
     # TODO: Under the hood payload change notification
@@ -438,11 +434,13 @@ async def get_issue_self(request: web.BaseRequest):
 
         # NOTE(Krzosa): serialize additional fields which are not serializable
         # by default
+        payload = await load_string(context, i.payload_dri)
+
         record.update(
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload": await pds.load(i.payload_dri),
+                "payload": payload,
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }

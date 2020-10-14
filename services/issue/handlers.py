@@ -25,7 +25,7 @@ import hashlib
 import uuid
 import json
 
-from aries_cloudagent.pdstorage_thcf.base import BasePersonalDataStorage
+from aries_cloudagent.pdstorage_thcf.api import *
 
 LOGGER = logging.getLogger(__name__)
 
@@ -128,8 +128,6 @@ class GetIssueHandler(BaseHandler):
         assert isinstance(context.message, GetIssue)
 
         storage: BaseStorage = await context.inject(BaseStorage)
-        pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
-
         try:
             record: ServiceIssueRecord = (
                 await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
@@ -142,8 +140,8 @@ class GetIssueHandler(BaseHandler):
             LOGGER.error("GetIssueHandler error %s", err)
             return
 
-        payload = await pds.load(record.payload_dri)
-        print("payload = await pds.load(i.payload_dri)", payload)
+        payload = await load_string(context, record.payload_dri)
+        print("GetIssueHandler payload = load_string", payload)
 
         response = GetIssueResponse(
             label=record.label,
@@ -161,7 +159,6 @@ class GetIssueResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         print("GetIssueResponseHandler received")
         assert isinstance(context.message, GetIssueResponse)
-        pds: BasePersonalDataStorage = await context.inject(BasePersonalDataStorage)
 
         try:
             issue: ServiceIssueRecord = (
@@ -175,8 +172,8 @@ class GetIssueResponseHandler(BaseHandler):
             LOGGER.error("GetIssueResponseHandler error %s", err)
             return
 
-        payload_dri = await pds.save(context.message.payload)
-        print("payload_dri", payload_dri)
+        payload_dri = await save_string(context, context.message.payload)
+        print("GetIssueResponseHandler payload_dri", payload_dri)
 
         if issue.label == None:
             issue.label = context.message.label
@@ -186,6 +183,7 @@ class GetIssueResponseHandler(BaseHandler):
             issue.service_schema = json.loads(context.message.service_schema)
         if issue.consent_schema == None:
             issue.consent_schema = json.loads(context.message.consent_schema)
+
         issue_id = await issue.save(context)
 
         await responder.send_webhook(
