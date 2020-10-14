@@ -52,7 +52,10 @@ class DiscoveryResponseSchema(AgentMessageSchema):
     class Meta:
         model_class = DiscoveryResponse
 
-    services = fields.List(fields.Nested(DiscoveryServiceSchema()), required=True,)
+    services = fields.List(
+        fields.Nested(DiscoveryServiceSchema()),
+        required=True,
+    )
 
 
 """
@@ -84,4 +87,7 @@ class DEBUGDiscoveryResponseSchema(AgentMessageSchema):
     class Meta:
         model_class = DEBUGDiscoveryResponse
 
-    services = fields.List(fields.Nested(DiscoveryServiceSchema()), required=True,)
+    services = fields.List(
+        fields.Nested(DiscoveryServiceSchema()),
+        required=True,
+    )

@@ -29,6 +29,8 @@ import hashlib
 import uuid
 import json
 
+from aries_cloudagent.pdstorage_thcf.api import *
+
 
 class DiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
@@ -42,10 +44,19 @@ class DiscoveryHandler(BaseHandler):
         records = []
         for service in query:
             record = DiscoveryServiceSchema()
+
+            consent_schema = service.consent_schema
+            consent_schema_data = await load_string(
+                context, consent_schema.get("data_dri"), "data_vault"
+            )
+            if consent_schema_data != None:
+                consent_schema["data"] = consent_schema_data
+            print('consent_schema.get("data")', consent_schema.get("data"))
+
             record = record.dump(
                 {
                     "service_schema": service.service_schema,
-                    "consent_schema": service.consent_schema,
+                    "consent_schema": consent_schema,
                     "service_id": service._id,
                     "label": service.label,
                 }
@@ -102,8 +113,8 @@ class DEBUGServiceDiscoveryRecord(BaseRecord):
 
     @property
     def record_tags(self) -> dict:
-        """Get tags for record, 
-            NOTE: relevent when filtering by tags"""
+        """Get tags for record,
+        NOTE: relevent when filtering by tags"""
         return {
             "connection_id": self.connection_id,
         }
@@ -113,7 +124,8 @@ class DEBUGServiceDiscoveryRecord(BaseRecord):
         cls, context: InjectionContext, connection_id: str
     ):
         return await cls.retrieve_by_tag_filter(
-            context, {"connection_id": connection_id},
+            context,
+            {"connection_id": connection_id},
         )
 
 
@@ -127,7 +139,9 @@ class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
 
 class DEBUGDiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage,)
+        storage: BaseStorage = await context.inject(
+            BaseStorage,
+        )
 
         assert isinstance(context.message, DEBUGDiscovery)
 
@@ -164,7 +178,8 @@ class DEBUGDiscoveryResponseHandler(BaseHandler):
             record.services = context.message.services
         except StorageNotFoundError:
             record: DEBUGServiceDiscoveryRecord = DEBUGServiceDiscoveryRecord(
-                services=context.message.services, connection_id=connection_id,
+                services=context.message.services,
+                connection_id=connection_id,
             )
 
         if context.message.services != []:
