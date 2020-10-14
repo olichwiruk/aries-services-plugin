@@ -47,7 +47,7 @@ class DiscoveryHandler(BaseHandler):
 
             consent_schema = service.consent_schema
             consent_schema_data = await load_string(
-                context, consent_schema.get("data_dri"), "data_vault"
+                context, consent_schema.get("data_dri")
             )
             if consent_schema_data != None:
                 consent_schema["data"] = consent_schema_data
