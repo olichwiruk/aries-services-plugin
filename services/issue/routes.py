@@ -334,7 +334,7 @@ async def process_application(request: web.BaseRequest):
                     {
                         "name": "data_dri",
                         "mime-type": "application/json",
-                        "value": issue.issuer_data_dri_cache,
+                        "value": issue.payload_dri,
                     },
                     {
                         "name": "oca_schema_namespace",
