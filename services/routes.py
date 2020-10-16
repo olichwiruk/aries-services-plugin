@@ -2,6 +2,7 @@ from aiohttp import web
 
 from .issue.routes import *
 from .discovery.routes import *
+from .consents.routes import *
 
 # NOTE: define functions in sub routes files (i.e issue.routes) and register
 # them here
@@ -29,6 +30,7 @@ async def register(app: web.Application):
                 DEBUGrequest_services_list,
                 allow_head=False,
             ),
+            web.post("/verifiable-services/consents", add_consent),
             # web.get(
             #     "/verifiable-services/get-credential-data/{data_dri}",
             #     DEBUGget_credential_data,
