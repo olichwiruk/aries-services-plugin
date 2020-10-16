@@ -15,12 +15,27 @@ class AddConsentSchema(Schema):
 @request_schema(AddConsentSchema())
 @docs(tags=["Defined Consents"], summary="Add consent definition")
 async def add_consent(request: web.BaseRequest):
+    context = request.app["request_context"]
     params = await request.json()
+    errors = []
 
-    defined_consent = DefinedConsentRecord(
-        label=params["label"],
-        oca_schema=params["oca_schema"],
-        payload_dri=''
+    existing_consents = await DefinedConsentRecord.query(
+        context, {"label": params["label"]}
     )
+    if existing_consents:
+        errors.append(
+            f"Consent with '{params['label']}' label is already defined"
+        )
 
-    return web.json_response(defined_consent.serialize())
+    if errors:
+        return web.json_response({"success": False, "errors": errors})
+    else:
+        defined_consent = DefinedConsentRecord(
+            label=params["label"],
+            oca_schema=params["oca_schema"],
+            payload_dri=''
+        )
+
+        await defined_consent.save(context)
+
+        return web.json_response({"success": True})
