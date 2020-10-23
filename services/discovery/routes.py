@@ -52,38 +52,11 @@ async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
-    # context.settings.set_value("wallet.type", "http")
-    # wallet = HttpWallet()
-
-    # context.injector.bind_instance(BaseWallet, wallet)
-    # wallet: BaseWallet = await context.inject(BaseWallet)
-    # print(context.settings)
-
-    # wallet.open()
-
     service_record = ServiceRecord(
         label=params["label"],
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
     )
-
-    # Search for the consent in DataVault and make sure that it exists
-    # async with ClientSession() as session:
-    #     async with session.get(
-    #         DATA_VAULT + params["consent_schema"]["data_dri"]
-    #     ) as response:
-    #         text: str = await response.text()
-    #         if response.status != 200 or text == None:
-    #             raise web.HTTPNotFound(reason="Consent not found")
-
-    #         text = json.loads(text)
-    #         print(text)
-    #         if (
-    #             "expiration" not in text
-    #             or "limitation" not in text
-    #             or "validityTTL" not in text
-    #         ):
-    #             raise web.HTTPNotFound(reason="Consent, unfamiliar format")
 
     try:
         hash_id = await service_record.save(context)
@@ -119,7 +92,8 @@ async def request_services_list(request: web.BaseRequest):
 
 
 @docs(
-    tags=["Service Discovery"], summary="Get a list of all services I registered",
+    tags=["Service Discovery"],
+    summary="Get a list of all services I registered",
 )
 async def self_service_list(request: web.BaseRequest):
     context = request.app["request_context"]
@@ -161,8 +135,10 @@ async def DEBUGrequest_services_list(request: web.BaseRequest):
         max_retries = 8
         for i in range(max_retries):
             try:
-                query: DEBUGServiceDiscoveryRecord = await DEBUGServiceDiscoveryRecord().retrieve_by_connection_id(
-                    context, connection_id
+                query: DEBUGServiceDiscoveryRecord = (
+                    await DEBUGServiceDiscoveryRecord().retrieve_by_connection_id(
+                        context, connection_id
+                    )
                 )
                 return web.json_response(query.serialize())
             except StorageNotFoundError:
