@@ -31,6 +31,11 @@ class ServiceSchema(Schema):
     oca_schema_namespace = fields.Str(required=False)
 
 
+class OcaSchema(Schema):
+    namespace = fields.Str(required=False)
+    dri = fields.Str(required=False)
+
+
 class ServiceRecord(BaseRecord):
     RECORD_ID_NAME = "record_id"
     RECORD_TYPE = "verifiable_services"
