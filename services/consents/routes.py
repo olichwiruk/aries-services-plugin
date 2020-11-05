@@ -53,7 +53,6 @@ async def get_consents(request: web.BaseRequest):
     result = list(map(lambda el: el.record_value, all_consents))
     for consent in result:
         payload = await load_string(context, consent["payload_dri"])
-        consent.pop("payload_dri")
         if payload:
             consent["payload"] = json.loads(payload)
         else:
