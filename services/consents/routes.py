@@ -33,7 +33,8 @@ async def add_consent(request: web.BaseRequest):
     if errors:
         return web.json_response({"success": False, "errors": errors})
     else:
-        payload_dri = await save_string(context, json.dumps(params["payload"]))
+        metadata = { "oca_schema_dri": params["oca_schema"]["dri"] }
+        payload_dri = await save_string(context, json.dumps(params["payload"]), json.dumps(metadata))
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
