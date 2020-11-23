@@ -172,7 +172,8 @@ class GetIssueResponseHandler(BaseHandler):
             LOGGER.error("GetIssueResponseHandler error %s", err)
             return
 
-        payload_dri = await save_string(context, context.message.payload)
+        metadata = { "oca_schema_dri": json.loads(context.message.service_schema)["oca_schema_dri"] }
+        payload_dri = await save_string(context, context.message.payload, json.dumps(metadata))
         print("GetIssueResponseHandler payload_dri", payload_dri)
 
         if issue.label == None:

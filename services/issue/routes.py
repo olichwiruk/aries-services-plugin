@@ -161,7 +161,8 @@ async def apply(request: web.BaseRequest):
     if connection.is_ready:
         await outbound_handler(credential_offer_message, connection_id=connection_id)
 
-        payload_dri = await save_string(context, payload)
+        metadata = { "oca_schema_dri": service_schema["oca_schema_dri"] }
+        payload_dri = await save_string(context, payload, json.dumps(metadata))
         record = ServiceIssueRecord(
             connection_id=connection_id,
             state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
