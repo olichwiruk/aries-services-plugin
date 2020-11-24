@@ -14,6 +14,7 @@ MESSAGE_TYPES = {
     DEBUGDISCOVERY_RESPONSE: f"{PROTOCOL_PACKAGE}.DEBUGDiscoveryResponse",
 }
 
+
 # Messages
 from ..util import generate_model_schema
 from marshmallow import Schema, fields
