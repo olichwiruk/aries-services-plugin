@@ -13,8 +13,14 @@ async def register(app: web.Application):
         [
             web.post("/verifiable-services/add", add_service),
             web.post("/verifiable-services/apply", apply),
-            web.post("/verifiable-services/get-issue-self", get_issue_self,),
-            web.post("/verifiable-services/process-application", process_application,),
+            web.post(
+                "/verifiable-services/get-issue-self",
+                get_issue_self,
+            ),
+            web.post(
+                "/verifiable-services/process-application",
+                process_application,
+            ),
             web.get(
                 "/verifiable-services/request-service-list/{connection_id}",
                 request_services_list,
@@ -31,11 +37,7 @@ async def register(app: web.Application):
                 allow_head=False,
             ),
             web.post("/verifiable-services/consents", add_consent),
-            web.get(
-                "/verifiable-services/consents",
-                get_consents,
-                allow_head=False
-            ),
+            web.get("/verifiable-services/consents", get_consents, allow_head=False),
             # web.get(
             #     "/verifiable-services/get-credential-data/{data_dri}",
             #     DEBUGget_credential_data,
