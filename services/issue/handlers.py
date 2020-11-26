@@ -79,6 +79,11 @@ class ApplicationHandler(BaseHandler):
             return
 
         """
+        TODO: 
+        Check DATA DRI ! Wild memes are happening
+        """
+
+        """
 
         Verify consent against these three vars from service requirements
 
@@ -86,6 +91,7 @@ class ApplicationHandler(BaseHandler):
         namespace = service.consent_schema["oca_schema_namespace"]
         oca_dri = service.consent_schema["oca_schema_dri"]
         data_dri = service.consent_schema["data_dri"]
+        cred_content = consent["credentialSubject"]
 
         LOGGER.info(
             f"Conditions:{cred_content['data_dri'] != data_dri}"
@@ -94,14 +100,13 @@ class ApplicationHandler(BaseHandler):
             f"{cred_content['service_consent_match_id']}"
         )
 
-        cred_content = consent["credentialSubject"]
-        if (
+        is_malformed = (
             cred_content["data_dri"] != data_dri
             or cred_content["oca_schema_namespace"] != namespace
             or cred_content["oca_schema_dri"] != oca_dri
-            or cred_content["service_consent_match_id"]
-            == service.service_consent_match_id
-        ):
+        )
+
+        if is_malformed:
             await send_confirmation(
                 context,
                 responder,
@@ -110,7 +115,7 @@ class ApplicationHandler(BaseHandler):
             )
             assert (
                 0
-            ), "Incoming consent credential doesn't match with service consent credential"
+            ), f"Ismalformed? {is_malformed} Incoming consent credential doesn't match with service consent credential"
 
         if not await verify_proof(wallet, consent):
             await send_confirmation(
@@ -180,6 +185,11 @@ class ApplicationResponseHandler(BaseHandler):
         credential = json.loads(cred_str, object_pairs_hook=OrderedDict)
 
         """
+        TODO: 
+        Check DATA DRI ! Wild memes are happening
+        """
+
+        """
 
         Check if we got(credential) what was *promised* by the service provider 
 
@@ -212,7 +222,7 @@ class ApplicationResponseHandler(BaseHandler):
 
         """
 
-        Store credential, check the credential signature
+        Check the proof and save
 
         """
 
@@ -226,9 +236,9 @@ class ApplicationResponseHandler(BaseHandler):
         except HolderError as err:
             raise HandlerException(err.roll_up)
 
-
         issue.state = ServiceIssueRecord.ISSUE_CREDENTIAL_RECEIVED
-        issue.
+        issue.credential_id = credential_id
+        await issue.save(context)
 
         await responder.send_webhook(
             "verifiable-services/credential-received",

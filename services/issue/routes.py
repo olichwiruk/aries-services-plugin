@@ -129,12 +129,6 @@ async def apply(request: web.BaseRequest):
             exception=web.HTTPError,
         )
 
-        # PROBLEM: From front end perspective we need a panel which has all consents given
-        # SOLUTION1: Query for all service applications and retrieve the consent
-        # SOLUTION2: Save all consents through higher level api which will make
-        #            creating consents more clear, also I can now pump all the information
-        #            into one place
-
         payload_dri = await save_string(context, payload)
         record = ServiceIssueRecord(
             connection_id=connection_id,
