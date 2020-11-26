@@ -53,6 +53,7 @@ class ServiceIssueRecord(BaseRecord):
         service_schema: ServiceSchema = None,
         issuer_data_dri_cache: str = None,
         service_consent_match_id: str = None,
+        consent_credential: dict = None,
         #
         exchange_id: str = None,
         record_id: str = None,
@@ -71,6 +72,7 @@ class ServiceIssueRecord(BaseRecord):
         self.credential_definition_id = credential_definition_id
         self.issuer_data_dri_cache = issuer_data_dri_cache
         self.service_consent_match_id = service_consent_match_id
+        self.consent_credential = consent_credential
 
     @property
     def record_value(self) -> dict:
@@ -90,6 +92,7 @@ class ServiceIssueRecord(BaseRecord):
                 "credential_definition_id",
                 "issuer_data_dri_cache",
                 "service_consent_match_id",
+                "consent_credential",
             )
         }
 
@@ -193,3 +196,4 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     label = fields.Str(required=False)
     service_id = fields.Str(required=False)
     service_consent_match_id = fields.Str(required=False)
+    consent_credential = fields.Str(required=False)

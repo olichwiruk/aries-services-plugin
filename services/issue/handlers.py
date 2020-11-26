@@ -5,6 +5,11 @@ from aries_cloudagent.messaging.base_handler import (
     RequestContext,
 )
 from aries_cloudagent.storage.base import BaseStorage
+from aries_cloudagent.wallet.base import BaseWallet
+from aries_cloudagent.verifier.base import BaseVerifier
+from aries_cloudagent.aathcf.credentials import (
+    verify_proof,
+)
 
 # Exceptions
 from aries_cloudagent.storage.error import StorageDuplicateError, StorageNotFoundError
@@ -20,12 +25,14 @@ from ..models import ServiceRecord
 # External
 from asyncio import shield
 from marshmallow import fields, Schema
+from collections import OrderedDict
 import logging
 import hashlib
 import uuid
 import json
 
 from aries_cloudagent.pdstorage_thcf.api import *
+from aries_cloudagent.aathcf.utils import debug_handler
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,10 +51,13 @@ async def send_confirmation(context, responder, exchange_id, state=None):
 # TODO: use standard problem report?
 class ApplicationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(BaseStorage)
+        debug_handler(self._logger.debug, context, Application)
 
-        LOGGER.info("Application Handler %s", context.message)
-        assert isinstance(context.message, Application)
+        storage: BaseStorage = await context.inject(BaseStorage)
+        wallet: BaseWallet = await context.inject(BaseWallet)
+
+        consent = context.message.consent_credential
+        consent = json.loads(consent, object_pairs_hook=OrderedDict)
 
         try:
             service: ServiceRecord = await ServiceRecord.retrieve_by_id(
@@ -62,17 +72,60 @@ class ApplicationHandler(BaseHandler):
             )
             return
 
+        """
+
+        Check consent against these three vars from service requirements
+
+        """
+        namespace = service.consent_schema["oca_schema_namespace"]
+        oca_dri = service.consent_schema["oca_schema_dri"]
+        data_dri = service.consent_schema["data_dri"]
+
+        LOGGER.info(
+            f"Conditions:{cred_content['data_dri'] != data_dri}"
+            f"{cred_content['oca_schema_namespace'] != namespace}"
+            f"{cred_content['oca_schema_dri'] != oca_dri}"
+            f"{cred_content['service_consent_match_id']}"
+        )
+
+        cred_content = consent["credentialSubject"]
+        if (
+            cred_content["data_dri"] != data_dri
+            or cred_content["oca_schema_namespace"] != namespace
+            or cred_content["oca_schema_dri"] != oca_dri
+            or cred_content["service_consent_match_id"]
+            == service.service_consent_match_id
+        ):
+            await send_confirmation(
+                context,
+                responder,
+                context.message.exchange_id,
+                ServiceIssueRecord.ISSUE_REJECTED,
+            )
+            assert (
+                0
+            ), "Incoming consent credential doesn't match with service consent credential"
+
+        if not await verify_proof(wallet, consent):
+            await send_confirmation(
+                context,
+                responder,
+                context.message.exchange_id,
+                ServiceIssueRecord.ISSUE_REJECTED,
+            )
+            assert 0, "Credential failed the verification process"
+
         issue = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
             connection_id=context.connection_record.connection_id,
             exchange_id=context.message.exchange_id,
             service_id=context.message.service_id,
-            credential_definition_id=context.message.credential_definition_id,
             service_consent_match_id=context.message.service_consent_match_id,
             issuer_data_dri_cache=context.message.data_dri,
             service_schema=service.service_schema,
             consent_schema=service.consent_schema,
+            consent_credential=consent,
             label=service.label,
         )
 
@@ -96,22 +149,16 @@ class ApplicationHandler(BaseHandler):
 
 class ConfirmationHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
+        debug_handler(self._logger.debug, context, Confirmation)
         storage: BaseStorage = await context.inject(BaseStorage)
 
-        LOGGER.info("OK Confirmation received %s", context.message)
-        assert isinstance(context.message, Confirmation)
-
-        try:
-            record: ServiceIssueRecord = (
-                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                    context,
-                    context.message.exchange_id,
-                    context.connection_record.connection_id,
-                )
+        record: ServiceIssueRecord = (
+            await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
             )
-        except StorageNotFoundError as err:
-            LOGGER.info("ConfirmationHandler error %s", err)
-            return
+        )
 
         record.state = context.message.state
         record_id = await record.save(context, reason="Updated issue state")
@@ -124,24 +171,19 @@ class ConfirmationHandler(BaseHandler):
 
 class GetIssueHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        LOGGER.info("OK GetIssueHandler received %s", context.message)
-        assert isinstance(context.message, GetIssue)
+        debug_handler(self._logger.debug, context, GetIssue)
 
         storage: BaseStorage = await context.inject(BaseStorage)
-        try:
-            record: ServiceIssueRecord = (
-                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                    context,
-                    context.message.exchange_id,
-                    context.connection_record.connection_id,
-                )
+        record: ServiceIssueRecord = (
+            await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
             )
-        except StorageNotFoundError as err:
-            LOGGER.error("GetIssueHandler error %s", err)
-            return
+        )
 
         payload = await load_string(context, record.payload_dri)
-        print("GetIssueHandler payload = load_string", payload)
+        LOGGER.info("GetIssueHandler payload = load_string", payload)
 
         response = GetIssueResponse(
             label=record.label,
@@ -157,31 +199,25 @@ class GetIssueHandler(BaseHandler):
 
 class GetIssueResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        print("GetIssueResponseHandler received")
-        assert isinstance(context.message, GetIssueResponse)
-
-        try:
-            issue: ServiceIssueRecord = (
-                await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
-                    context,
-                    context.message.exchange_id,
-                    context.connection_record.connection_id,
-                )
+        debug_handler(self._logger.debug, context, GetIssueResponse)
+        issue: ServiceIssueRecord = (
+            await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
             )
-        except StorageNotFoundError as err:
-            LOGGER.error("GetIssueResponseHandler error %s", err)
-            return
+        )
 
         payload_dri = await save_string(context, context.message.payload)
-        print("GetIssueResponseHandler payload_dri", payload_dri)
+        LOGGER.info("GetIssueResponseHandler payload_dri", payload_dri)
 
-        if issue.label == None:
+        if issue.label is None:
             issue.label = context.message.label
-        if issue.payload_dri == None:
+        if issue.payload_dri is None:
             issue.payload_dri = payload_dri
-        if issue.service_schema == None:
+        if issue.service_schema is None:
             issue.service_schema = json.loads(context.message.service_schema)
-        if issue.consent_schema == None:
+        if issue.consent_schema is None:
             issue.consent_schema = json.loads(context.message.consent_schema)
 
         issue_id = await issue.save(context)
