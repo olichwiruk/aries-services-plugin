@@ -4,7 +4,6 @@ from aries_cloudagent.messaging.base_handler import (
     BaseResponder,
     RequestContext,
 )
-from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.wallet.base import BaseWallet
 from aries_cloudagent.verifier.base import BaseVerifier
 from aries_cloudagent.aathcf.credentials import (
@@ -38,6 +37,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 async def send_confirmation(context, responder, exchange_id, state=None):
+    """
+    Create and send a Confirmation message,
+    this updates the state of service exchange.
+    """
+
     LOGGER.info("send confirmation %s", state)
     confirmation = Confirmation(
         exchange_id=exchange_id,
@@ -48,12 +52,14 @@ async def send_confirmation(context, responder, exchange_id, state=None):
     await responder.send_reply(confirmation)
 
 
-# TODO: use standard problem report?
 class ApplicationHandler(BaseHandler):
+    """
+    Handles the service application, saves it to storage and notifies the
+    controller that a service application came.
+    """
+
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, Application)
-
-        storage: BaseStorage = await context.inject(BaseStorage)
         wallet: BaseWallet = await context.inject(BaseWallet)
 
         consent = context.message.consent_credential
@@ -74,7 +80,7 @@ class ApplicationHandler(BaseHandler):
 
         """
 
-        Check consent against these three vars from service requirements
+        Verify consent against these three vars from service requirements
 
         """
         namespace = service.consent_schema["oca_schema_namespace"]
@@ -115,6 +121,12 @@ class ApplicationHandler(BaseHandler):
             )
             assert 0, "Credential failed the verification process"
 
+        """
+
+        Pack save confirm
+
+        """
+
         issue = ServiceIssueRecord(
             state=ServiceIssueRecord.ISSUE_PENDING,
             author=ServiceIssueRecord.AUTHOR_OTHER,
@@ -147,11 +159,92 @@ class ApplicationHandler(BaseHandler):
         )
 
 
+class ApplicationResponseHandler(BaseHandler):
+    """
+    Handles the message with issued credential for given service.
+    So makes sure the credential is correct and saves it
+    """
+
+    async def handle(self, context: RequestContext, responder: BaseResponder):
+        debug_handler(self._logger.debug, context, ApplicationResponse)
+
+        issue: ServiceIssueRecord = (
+            await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
+                context,
+                context.message.exchange_id,
+                context.connection_record.connection_id,
+            )
+        )
+
+        cred_str = context.message.credential
+        credential = json.loads(cred_str, object_pairs_hook=OrderedDict)
+
+        """
+
+        Check if we got(credential) what was *promised* by the service provider 
+
+        """
+
+        promised_oca_dri = issue.service_schema["oca_schema_dri"]
+        promised_namespace = issue.service_schema["oca_schema_namespace"]
+        promised_data_dri = issue.payload_dri
+        promised_conset_match = issue.service_consent_match_id
+
+        subject = credential["credentialSubject"]
+
+        is_malformed = (
+            subject["oca_schema_dri"] is not promised_oca_dri
+            or subject["oca_schema_namespace"] is not promised_namespace
+            or subject["data_dri"] is not promised_data_dri
+            or subject["service_consent_match_id"] is not promised_conset_match
+        )
+
+        if is_malformed:
+            self._logger.error(
+                f"is_malformed ? {is_malformed}"
+                f"promised_oca_dri: {promised_oca_dri} promised_namespace: {promised_namespace}"
+                f"promised_data_dri: {promised_data_dri} promised_conset_match: {promised_conset_match}"
+                f"malformed credential {credential}"
+            )
+            raise HandlerException(
+                "Incoming credential is different from the promised credential!"
+            )
+
+        """
+
+        Store credential, check the credential signature
+
+        """
+
+        try:
+            credential_id = await holder.store_credential(
+                credential_definition={},
+                credential_data=credential,
+                credential_request_metadata={},
+            )
+            self._logger.info("Stored Credential ID %s", credential_id)
+        except HolderError as err:
+            raise HandlerException(err.roll_up)
+
+
+        issue.state = ServiceIssueRecord.ISSUE_CREDENTIAL_RECEIVED
+        issue.
+
+        await responder.send_webhook(
+            "verifiable-services/credential-received",
+            {"credential_id": credential_id, "connection_id": responder.connection_id},
+        )
+
+
 class ConfirmationHandler(BaseHandler):
+    """
+    Handles the state updates in service exchange
+
+    TODO: ProblemReport ? Maybe there is a better way to handle this.
+    """
+
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, Confirmation)
-        storage: BaseStorage = await context.inject(BaseStorage)
-
         record: ServiceIssueRecord = (
             await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
                 context,
@@ -172,8 +265,6 @@ class ConfirmationHandler(BaseHandler):
 class GetIssueHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, GetIssue)
-
-        storage: BaseStorage = await context.inject(BaseStorage)
         record: ServiceIssueRecord = (
             await ServiceIssueRecord.retrieve_by_exchange_id_and_connection_id(
                 context,

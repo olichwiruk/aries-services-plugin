@@ -31,6 +31,7 @@ class ServiceIssueRecord(BaseRecord):
     ISSUE_PENDING = "pending"
     ISSUE_REJECTED = "rejected"
     ISSUE_ACCEPTED = "accepted"
+    ISSUE_CREDENTIAL_RECEIVED = "credential_received"
 
     AUTHOR_SELF = "self"
     AUTHOR_OTHER = "other"

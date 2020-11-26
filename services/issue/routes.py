@@ -241,9 +241,9 @@ async def process_application(request: web.BaseRequest):
 
     issue.state = ServiceIssueRecord.ISSUE_ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
-    await confirmer.send_confirmation(issue.state)
 
-    await outbound_handler(credential_offer_message, connection_id=connection_id)
+    resp = ApplicationResponse(credential=credential, exchange_id=exchange_id)
+    await outbound_handler(resp, connection_id=connection_id)
     return web.json_response(
         {
             "issue_id": issue._id,

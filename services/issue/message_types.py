@@ -9,12 +9,14 @@ PROTOCOL_PACKAGE = "services.issue.handlers"
 
 
 APPLICATION = f"{PROTOCOL_URI}/application"
+APPLICATION_RESPONSE = f"{PROTOCOL_URI}/application-response"
 CONFIRMATION = f"{PROTOCOL_URI}/confirmation"
 GET_ISSUE = f"{PROTOCOL_URI}/get-issue"
 GET_ISSUE_RESPONSE = f"{PROTOCOL_URI}/get-issue-response"
 
 MESSAGE_TYPES = {
     APPLICATION: f"{PROTOCOL_PACKAGE}.Application",
+    APPLICATION_RESPONSE: f"{PROTOCOL_PACKAGE}.ApplicationResponse",
     CONFIRMATION: f"{PROTOCOL_PACKAGE}.Confirmation",
     GET_ISSUE: f"{PROTOCOL_PACKAGE}.GetIssue",
     GET_ISSUE_RESPONSE: f"{PROTOCOL_PACKAGE}.GetIssueResponse",
@@ -32,6 +34,16 @@ Application, ApplicationSchema = generate_model_schema(
         "data_dri": fields.Str(required=True),
         "service_consent_match_id": fields.Str(required=True),
         "consent_credential": fields.Str(required=True),
+    },
+)
+
+ApplicationResponse, ApplicationResponseSchema = generate_model_schema(
+    name="ApplicationResponse",
+    handler=f"{PROTOCOL_PACKAGE}.ApplicationResponseHandler",
+    msg_type=APPLICATION_RESPONSE,
+    schema={
+        "credential": fields.Str(required=True),
+        "exchange_id": fields.Str(required=True),
     },
 )
 
