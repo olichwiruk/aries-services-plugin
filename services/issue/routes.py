@@ -41,7 +41,7 @@ LOGGER = logging.getLogger(__name__)
 
 class ApplySchema(Schema):
     connection_id = fields.Str(required=True)
-    payload = fields.Str(required=True)
+    user_data = fields.Str(required=True)
     service = fields.Nested(DiscoveryServiceSchema())
 
 
@@ -92,7 +92,7 @@ async def apply(request: web.BaseRequest):
 
     params = await request.json()
     connection_id = params["connection_id"]
-    payload = params["payload"]
+    service_user_data = params["user_data"]
     service_id = params["service"]["service_id"]
     consent_schema = params["service"]["consent_schema"]
     service_schema = params["service"]["service_schema"]
@@ -102,12 +102,8 @@ async def apply(request: web.BaseRequest):
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
     """
-    Issue consent credential for other party (offer credential -> automatic consent issue)
 
-    This should be rethought I think, perhaps present self certifying credential?
-    This either way probably should be a presentation instead of issue
-    or maybe a credential after some thought?
-    that way the other person can save it
+    Issue consent credential for service provider
 
     """
 
@@ -126,25 +122,35 @@ async def apply(request: web.BaseRequest):
         exception=web.HTTPError,
     )
 
-    payload_dri = await save_string(context, payload)
+    service_user_data_dri = await save_string(context, service_user_data)
     record = ServiceIssueRecord(
         connection_id=connection_id,
         state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
         author=ServiceIssueRecord.AUTHOR_SELF,
-        service_id=service_id,
         label=label,
         consent_schema=consent_schema,
+        service_id=service_id,
         service_schema=service_schema,
-        payload_dri=payload_dri,
+        service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
     )
 
-    data_dri = await record.save(context)
+    await record.save(context)
+
+    """ 
+    NOTE: service_user_data_dri - is here so that in the future it would be easier
+          to not send the service_user_data, because from what I understand we only
+          want to send that to the other party under certain conditions
+          
+          dri is used only to make sure DRI's are the same 
+          when I store the data in other's agent PDS
+    """
 
     request = Application(
         service_id=record.service_id,
         exchange_id=record.exchange_id,
-        data_dri=data_dri,
+        service_user_data=service_user_data,
+        service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
         consent_credential=credential,
     )
@@ -152,16 +158,9 @@ async def apply(request: web.BaseRequest):
     return web.json_response(request.serialize())
 
 
-# TODO: Connection record, connection ready
-class StatusConfirmer:
-    def __init__(self, outbound_handler, connection_id, exchange_id):
-        self.outbound_handler = outbound_handler
-        self.connection_id = connection_id
-        self.exchange_id = exchange_id
-
-    async def send_confirmation(self, state):
-        confirmation = Confirmation(exchange_id=self.exchange_id, state=state)
-        await self.outbound_handler(confirmation, connection_id=self.connection_id)
+async def send_confirmation(outbound_handler, connection_id, exchange_id, state):
+    confirmation = Confirmation(exchange_id=exchange_id, state=state)
+    await outbound_handler(confirmation, connection_id=connection_id)
 
 
 @docs(
@@ -184,13 +183,11 @@ async def process_application(request: web.BaseRequest):
     issue_id = params["issue_id"]
 
     issue: ServiceIssueRecord = await retrieve_service_issue(context, issue_id)
-    connection_id = issue.connection_id
     exchange_id = issue.exchange_id
+    connection_id = issue.connection_id
 
     service: ServiceRecord = await retrieve_service(context, issue.service_id)
     connection: ConnectionRecord = await retrieve_connection(context, connection_id)
-
-    confirmer = StatusConfirmer(outbound_handler, connection_id, exchange_id)
 
     """
 
@@ -204,7 +201,9 @@ async def process_application(request: web.BaseRequest):
     ):
         issue.state = ServiceIssueRecord.ISSUE_REJECTED
         await issue.save(context, reason="Issue reject saved")
-        await confirmer.send_confirmation(issue.state)
+        await send_confirmation(
+            outbound_handler, connection_id, exchange_id, issue.state
+        )
         return web.json_response(issue.serialize())
 
     """
@@ -219,7 +218,7 @@ async def process_application(request: web.BaseRequest):
             "credential_values": {
                 "oca_schema_dri": service.service_schema["oca_schema_dri"],
                 "oca_schema_namespace": service.service_schema["oca_schema_namespace"],
-                "data_dri": issue.payload_dri,
+                "data_dri": issue.service_user_data_dri,
                 "service_consent_match_id": issue.service_consent_match_id,
             }
         },
@@ -275,8 +274,6 @@ async def get_issue_self(request: web.BaseRequest):
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
 
-    # TODO: Under the hood payload change notification
-    # ERROR:
     if "issue_id" in params and params["issue_id"] != None:
         try:
             query = [
@@ -294,21 +291,18 @@ async def get_issue_self(request: web.BaseRequest):
     for i in query:
         record: dict = i.serialize()
 
-        # NOTE(Krzosa): request additional information from the agent
-        # that we had this interaction with
-        if i.payload_dri == None:
-            request = GetIssue(exchange_id=i.exchange_id)
-            await outbound_handler(request, connection_id=i.connection_id)
+        """
+        Serialize additional fields which are not serializable
+        by default (information that is in PDS)
+        """
 
-        # NOTE(Krzosa): serialize additional fields which are not serializable
-        # by default
-        payload = await load_string(context, i.payload_dri)
+        service_user_data = await load_string(context, i.service_user_data_dri)
 
         record.update(
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload": payload,
+                "service_user_data": service_user_data,
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }
@@ -318,21 +312,6 @@ async def get_issue_self(request: web.BaseRequest):
     return web.json_response(result)
 
 
-@docs(
-    tags=["Verifiable Services"],
-    summary="Get state of a service issue",
-    description="""
-    You can filter issues by:
-        service_id
-        connection_id
-        exchange_id (id of a group of issue messages)
-
-    This returns a list, you can exclude a filter just by not including it
-    so if you dont want to search by exchange_id make sure to only include:
-        {"connection_id": "123", "service_id": "1234"}
-    """,
-)
-@request_schema(ApplyStatusSchema())
 async def DEBUGapply_status(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()

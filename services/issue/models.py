@@ -48,11 +48,10 @@ class ServiceIssueRecord(BaseRecord):
         connection_id: str = None,
         # Holder / (cred requester) values
         label: str = None,
-        payload_dri: str = None,
         credential_definition_id: str = None,
         consent_schema: ConsentSchema = None,
         service_schema: ServiceSchema = None,
-        issuer_data_dri_cache: str = None,
+        service_user_data_dri: str = None,
         service_consent_match_id: str = None,
         consent_credential: dict = None,
         credential_id: str = None,
@@ -68,11 +67,10 @@ class ServiceIssueRecord(BaseRecord):
         self.exchange_id = str(uuid.uuid4()) if exchange_id is None else exchange_id
         # Holder / (cred requester) values
         self.label = label
-        self.payload_dri = payload_dri
         self.consent_schema = consent_schema
         self.service_schema = service_schema
         self.credential_definition_id = credential_definition_id
-        self.issuer_data_dri_cache = issuer_data_dri_cache
+        self.service_user_data_dri = service_user_data_dri
         self.service_consent_match_id = service_consent_match_id
         self.consent_credential = consent_credential
         self.credential_id = credential_id
@@ -89,11 +87,10 @@ class ServiceIssueRecord(BaseRecord):
                 "exchange_id",
                 "service_id",
                 "label",
-                "payload_dri",
                 "consent_schema",
                 "service_schema",
                 "credential_definition_id",
-                "issuer_data_dri_cache",
+                "service_user_data_dri",
                 "service_consent_match_id",
                 "consent_credential",
                 "credential_id",
@@ -202,3 +199,4 @@ class ServiceIssueRecordSchema(BaseRecordSchema):
     service_consent_match_id = fields.Str(required=False)
     consent_credential = fields.Str(required=False)
     credential_id = fields.Str(required=False)
+    service_user_data_dri = fields.Str(required=False)
