@@ -3,6 +3,7 @@ from aries_cloudagent.messaging.base_handler import (
     BaseHandler,
     BaseResponder,
     RequestContext,
+    HandlerException,
 )
 from aries_cloudagent.wallet.base import BaseWallet
 from aries_cloudagent.verifier.base import BaseVerifier
@@ -201,23 +202,46 @@ class ApplicationResponseHandler(BaseHandler):
         promised_conset_match = issue.service_consent_match_id
 
         subject = credential["credentialSubject"]
-
-        is_malformed = (
-            subject["oca_schema_dri"] is not promised_oca_dri
-            or subject["oca_schema_namespace"] is not promised_namespace
-            or subject["data_dri"] is not promised_data_dri
-            or subject["service_consent_match_id"] is not promised_conset_match
+        print(
+            "SUBJECT",
+            subject["oca_schema_dri"],
+            subject["oca_schema_namespace"],
+            subject["data_dri"],
+            subject["service_consent_match_id"],
         )
 
-        if is_malformed:
-            self._logger.error(
-                f"is_malformed ? {is_malformed}"
-                f"promised_oca_dri: {promised_oca_dri} promised_namespace: {promised_namespace}"
-                f"promised_data_dri: {promised_data_dri} promised_conset_match: {promised_conset_match}"
-                f"malformed credential {credential}"
-            )
+        subject = credential["credentialSubject"]
+        print(
+            "Promised",
+            promised_oca_dri,
+            promised_namespace,
+            promised_data_dri,
+            promised_conset_match,
+        )
+
+        if subject["oca_schema_dri"] is not promised_oca_dri:
+            raise HandlerException("promised_oca_dri")
+        if subject["oca_schema_namespace"] is not promised_namespace:
+            raise HandlerException("promised_namespace")
+        if subject["data_dri"] is not promised_data_dri:
+            raise HandlerException("promised_data_dri")
+        if subject["service_consent_match_id"] is not promised_conset_match:
+            raise HandlerException("promised_conset_match")
+
+        is_cred_okay = (
+            subject["oca_schema_dri"] is promised_oca_dri
+            and subject["oca_schema_namespace"] is promised_namespace
+            and subject["data_dri"] is promised_data_dri
+            and subject["service_consent_match_id"] is promised_conset_match
+        )
+
+        if not is_cred_okay:
             raise HandlerException(
-                "Incoming credential is different from the promised credential!"
+                f"Incoming credential is malformed! \n"
+                f"is_cred_okay ? {is_cred_okay} \n"
+                f"promised_oca_dri: {promised_oca_dri} promised_namespace: {promised_namespace} \n"
+                f"promised_data_dri: {promised_data_dri} promised_conset_match: {promised_conset_match} \n"
+                f"malformed credential {credential} \n"
             )
 
         """
@@ -284,7 +308,7 @@ class GetIssueHandler(BaseHandler):
         )
 
         payload = await load_string(context, record.payload_dri)
-        LOGGER.info("GetIssueHandler payload = load_string", payload)
+        LOGGER.info("GetIssueHandler payload = load_string %s", payload)
 
         response = GetIssueResponse(
             label=record.label,
@@ -310,7 +334,7 @@ class GetIssueResponseHandler(BaseHandler):
         )
 
         payload_dri = await save_string(context, context.message.payload)
-        LOGGER.info("GetIssueResponseHandler payload_dri", payload_dri)
+        LOGGER.info("GetIssueResponseHandler payload_dri %s", payload_dri)
 
         if issue.label is None:
             issue.label = context.message.label
@@ -327,3 +351,16 @@ class GetIssueResponseHandler(BaseHandler):
             "verifiable-services/get-issue",
             {"issue_id": issue_id, "issue": issue.serialize()},
         )
+
+
+# is_cred_okay ? False
+# agent1.localhost_1   | promised_oca_dri: string promised_namespace: string
+# agent1.localhost_1   | promised_data_dri: zQmSnRDrp3sNzsB194RaKwqKWmFS7mbT8oiF7qMWUCoNGgQ promised_conset_match: 11aaf801-a959-427e-8b03-cca1a3ccedc9
+# OrderedDict([('context', ['https://www.w3.org/2018/credentials/v1',
+# 'https://www.schema.org']), ('type', ['VerifiableCredential']), ('issuer', '7NmT78qAJDQCSqPkDjpDWK'),
+# ('issuanceDate', '2020-11-27 08:45:32.344226Z'), ('credentialSubject', OrderedDict([('oca_schema_dri', 'string'),
+# ('oca_schema_namespace', 'string'), ('data_dri', 'zQmSnRDrp3sNzsB194RaKwqKWmFS7mbT8oiF7qMWUCoNGgQ'),
+#  ('service_consent_match_id', '11aaf801-a959-427e-8b03-cca1a3ccedc9'), ('id', 'Jij4NtGLMH1YeuEfpSUbWS')])),
+#  ('proof', OrderedDict([('jws', 'wkyB83_BSa8ytCuKJ9zKYFhl3aaRr8HHjUxppjHz-ZlEQRsNM5zAk1Qfx9EyYHn1WmpXl2vZDr0Nujlm10oVDg'),
+#  ('type', 'Ed25519Signature2018'), ('created', '2020-11-27 08:45:32.365386Z'), ('proofPurpose', 'assertionMethod'),
+# ('verificationMethod', 'CXr3inEAWqrSjDE7txxgEkgFoR1MgPw7ixEFfq8b9w58')]))

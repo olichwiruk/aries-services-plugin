@@ -29,7 +29,12 @@ from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.protocols.issue_credential.v1_1.messages.credential_request import (
     CredentialRequest,
 )
-from aries_cloudagent.protocols.issue_credential.v1_1.utils import create_credential
+from aries_cloudagent.protocols.issue_credential.v1_1.utils import (
+    create_credential,
+    retrieve_connection,
+)
+
+from ..util import retrieve_service, retrieve_service_issue
 
 LOGGER = logging.getLogger(__name__)
 
@@ -93,68 +98,58 @@ async def apply(request: web.BaseRequest):
     service_schema = params["service"]["service_schema"]
     label = params["service"]["label"]
 
-    try:
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound(reason="Connection not found")
-
+    connection = await retrieve_connection(context, connection_id)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
-    if connection.is_ready:
+    """
+    Issue consent credential for other party (offer credential -> automatic consent issue)
 
-        """
-        Issue consent credential for other party (offer credential -> automatic consent issue)
+    This should be rethought I think, perhaps present self certifying credential?
+    This either way probably should be a presentation instead of issue
+    or maybe a credential after some thought?
+    that way the other person can save it
 
-        This should be rethought I think, perhaps present self certifying credential?
-        This either way probably should be a presentation instead of issue
-        or maybe a credential after some thought?
-        that way the other person can save it
+    """
 
-        """
+    service_consent_match_id = str(uuid.uuid4())
+    credential = await create_credential(
+        context,
+        {
+            "credential_values": {
+                "oca_schema_dri": consent_schema["oca_schema_dri"],
+                "oca_schema_namespace": consent_schema["oca_schema_namespace"],
+                "data_dri": consent_schema["data_dri"],
+                "service_consent_match_id": service_consent_match_id,
+            }
+        },
+        connection,
+        exception=web.HTTPError,
+    )
 
-        service_consent_match_id = str(uuid.uuid4())
-        credential = await create_credential(
-            context,
-            {
-                "credential_values": {
-                    "oca_schema_dri": consent_schema["oca_schema_dri"],
-                    "oca_schema_namespace": consent_schema["oca_schema_namespace"],
-                    "data_dri": consent_schema["data_dri"],
-                    "service_consent_match_id": service_consent_match_id,
-                }
-            },
-            connection,
-            exception=web.HTTPError,
-        )
+    payload_dri = await save_string(context, payload)
+    record = ServiceIssueRecord(
+        connection_id=connection_id,
+        state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
+        author=ServiceIssueRecord.AUTHOR_SELF,
+        service_id=service_id,
+        label=label,
+        consent_schema=consent_schema,
+        service_schema=service_schema,
+        payload_dri=payload_dri,
+        service_consent_match_id=service_consent_match_id,
+    )
 
-        payload_dri = await save_string(context, payload)
-        record = ServiceIssueRecord(
-            connection_id=connection_id,
-            state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
-            author=ServiceIssueRecord.AUTHOR_SELF,
-            service_id=service_id,
-            label=label,
-            consent_schema=consent_schema,
-            service_schema=service_schema,
-            payload_dri=payload_dri,
-            service_consent_match_id=service_consent_match_id,
-        )
+    data_dri = await record.save(context)
 
-        data_dri = await record.save(context)
-
-        request = Application(
-            service_id=record.service_id,
-            exchange_id=record.exchange_id,
-            data_dri=data_dri,
-            service_consent_match_id=service_consent_match_id,
-            consent_credential=credential,
-        )
-        await outbound_handler(request, connection_id=connection_id)
-        return web.json_response(request.serialize())
-
-    raise web.HTTPBadGateway(reason="Agent to agent connection is not ready")
+    request = Application(
+        service_id=record.service_id,
+        exchange_id=record.exchange_id,
+        data_dri=data_dri,
+        service_consent_match_id=service_consent_match_id,
+        consent_credential=credential,
+    )
+    await outbound_handler(request, connection_id=connection_id)
+    return web.json_response(request.serialize())
 
 
 # TODO: Connection record, connection ready
@@ -167,9 +162,6 @@ class StatusConfirmer:
     async def send_confirmation(self, state):
         confirmation = Confirmation(exchange_id=self.exchange_id, state=state)
         await self.outbound_handler(confirmation, connection_id=self.connection_id)
-
-
-from ..util import retrieve_service, retrieve_service_issue
 
 
 @docs(
@@ -192,9 +184,11 @@ async def process_application(request: web.BaseRequest):
     issue_id = params["issue_id"]
 
     issue: ServiceIssueRecord = await retrieve_service_issue(context, issue_id)
-    service: ServiceRecord = await retrieve_service(context, issue.service_id)
     connection_id = issue.connection_id
     exchange_id = issue.exchange_id
+
+    service: ServiceRecord = await retrieve_service(context, issue.service_id)
+    connection: ConnectionRecord = await retrieve_connection(context, connection_id)
 
     confirmer = StatusConfirmer(outbound_handler, connection_id, exchange_id)
 
@@ -229,7 +223,7 @@ async def process_application(request: web.BaseRequest):
                 "service_consent_match_id": issue.service_consent_match_id,
             }
         },
-        connection_id,
+        connection,
         exception=web.HTTPError,
     )
 
