@@ -23,6 +23,7 @@ from asyncio import shield
 from .models import *
 from .message_types import *
 from ..models import *
+from ..consents.models.given_consent import ConsentGivenRecord
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.pdstorage_thcf.api import *
@@ -123,6 +124,7 @@ async def apply(request: web.BaseRequest):
     )
 
     service_user_data_dri = await save_string(context, service_user_data)
+
     record = ServiceIssueRecord(
         connection_id=connection_id,
         state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
@@ -141,7 +143,7 @@ async def apply(request: web.BaseRequest):
     NOTE: service_user_data_dri - is here so that in the future it would be easier
           to not send the service_user_data, because from what I understand we only
           want to send that to the other party under certain conditions
-          
+
           dri is used only to make sure DRI's are the same 
           when I store the data in other's agent PDS
     """
@@ -155,6 +157,22 @@ async def apply(request: web.BaseRequest):
         consent_credential=credential,
     )
     await outbound_handler(request, connection_id=connection_id)
+
+    """
+
+    record the given credential
+
+    """
+
+    consent_given_record = ConsentGivenRecord(
+        consent_user_data_dri=consent_schema["data_dri"],
+        connection_id=connection_id,
+        credential=credential,
+        service_consent_match_id=service_consent_match_id,
+    )
+
+    await consent_given_record.save(context)
+
     return web.json_response(request.serialize())
 
 

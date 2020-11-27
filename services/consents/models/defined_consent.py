@@ -1,6 +1,4 @@
-from aries_cloudagent.messaging.models.base_record import (
-    BaseRecord, BaseRecordSchema
-)
+from aries_cloudagent.messaging.models.base_record import BaseRecord, BaseRecordSchema
 from marshmallow import fields
 
 from ...models import OcaSchema
@@ -19,12 +17,11 @@ class DefinedConsentRecord(BaseRecord):
         label: str = None,
         oca_schema: OcaSchema = None,
         payload_dri: str = None,
-        # those usually are created later
         state: str = None,
         record_id: str = None,
-        **keywordArgs,
+        **keyword_args,
     ):
-        super().__init__(record_id, state, **keywordArgs)
+        super().__init__(record_id, state, **keyword_args)
         self.label = label
         self.oca_schema = oca_schema
         self.payload_dri = payload_dri
@@ -33,12 +30,7 @@ class DefinedConsentRecord(BaseRecord):
     def record_value(self) -> dict:
         """Accessor to for the JSON record value properties"""
         return {
-            prop: getattr(self, prop)
-            for prop in (
-                "label",
-                "oca_schema",
-                "payload_dri"
-            )
+            prop: getattr(self, prop) for prop in ("label", "oca_schema", "payload_dri")
         }
 
     @property

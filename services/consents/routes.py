@@ -7,6 +7,7 @@ import json
 from aries_cloudagent.pdstorage_thcf.api import save_string, load_string
 from ..models import OcaSchema
 from .models.defined_consent import DefinedConsentRecord
+from .models.given_consent import ConsentGivenRecord
 
 
 class AddConsentSchema(Schema):
@@ -26,9 +27,7 @@ async def add_consent(request: web.BaseRequest):
         context, {"label": params["label"]}
     )
     if existing_consents:
-        errors.append(
-            f"Consent with '{params['label']}' label is already defined"
-        )
+        errors.append(f"Consent with '{params['label']}' label is already defined")
 
     if errors:
         return web.json_response({"success": False, "errors": errors})
@@ -37,7 +36,7 @@ async def add_consent(request: web.BaseRequest):
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
-            payload_dri=payload_dri
+            payload_dri=payload_dri,
         )
 
         await defined_consent.save(context)
@@ -60,3 +59,17 @@ async def get_consents(request: web.BaseRequest):
             consent["payload"] = None
 
     return web.json_response({"success": True, "result": result})
+
+
+@docs(
+    tags=["Defined Consents"],
+    summary="Get all the consents I have given to other people",
+)
+async def get_consents_given(request: web.BaseRequest):
+    context = request.app["request_context"]
+
+    all_consents = await ConsentGivenRecord.query(context, {})
+    serialized = [i.serialize() for i in all_consents]
+    serialized["credential"] = json.loads(serialized["credential"])
+
+    return web.json_response({"success": True, "result": serialized})

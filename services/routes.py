@@ -38,6 +38,11 @@ async def register(app: web.Application):
             ),
             web.post("/verifiable-services/consents", add_consent),
             web.get("/verifiable-services/consents", get_consents, allow_head=False),
+            web.get(
+                "/verifiable-services/given-consents",
+                get_consents_given,
+                allow_head=False,
+            ),
             # web.get(
             #     "/verifiable-services/get-credential-data/{data_dri}",
             #     DEBUGget_credential_data,
