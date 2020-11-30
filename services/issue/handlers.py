@@ -128,7 +128,10 @@ class ApplicationHandler(BaseHandler):
 
         """
 
-        user_data_dri = await save_string(context, context.message.service_user_data)
+        metadata = {"oca_schema_dri": oca_dri}
+        user_data_dri = await save_string(
+            context, context.message.service_user_data, json.dumps(metadata)
+        )
         assert user_data_dri == context.message.service_user_data_dri
 
         issue = ServiceIssueRecord(
@@ -233,16 +236,13 @@ class ApplicationResponseHandler(BaseHandler):
         issue.credential_id = credential_id
         await issue.save(context)
 
-
         await responder.send_webhook(
             "verifiable-services/credential-received",
-            {"credential_id": credential_id, "connection_id": responder.connection_id},
+            {
+                "credential_id": credential_id,
+                "connection_id": responder.connection_id,
+            },
         )
-
-        metadata = { "oca_schema_dri": json.loads(context.message.service_schema)["oca_schema_dri"] }
-        payload_dri = await save_string(context, context.message.payload, json.dumps(metadata))
-        print("GetIssueResponseHandler payload_dri", payload_dri)
-
 
 
 class ConfirmationHandler(BaseHandler):
