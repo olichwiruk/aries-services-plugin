@@ -126,7 +126,8 @@ async def apply(request: web.BaseRequest):
         exception=web.HTTPError,
     )
 
-    service_user_data_dri = await save_string(context, service_user_data)
+    metadata = { "oca_schema_dri": service_schema["oca_schema_dri"]}
+    service_user_data_dri = await save_string(context, service_user_data, json.dumps(metadata))
 
     record = ServiceIssueRecord(
         connection_id=connection_id,
@@ -139,8 +140,9 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
     )
-
+    
     await record.save(context)
+
 
     """ 
     NOTE: service_user_data_dri - is here so that in the future it would be easier
