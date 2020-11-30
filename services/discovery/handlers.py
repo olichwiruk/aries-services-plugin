@@ -30,14 +30,13 @@ import uuid
 import json
 
 from aries_cloudagent.pdstorage_thcf.api import *
+from aries_cloudagent.aathcf.utils import debug_handler
 
 
 class DiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
+        debug_handler(self._logger.debug, context, Discovery)
         storage: BaseStorage = await context.inject(BaseStorage)
-
-        self._logger.debug("SERVICES DISCOVERY %s, ", context)
-        assert isinstance(context.message, Discovery)
 
         query = await ServiceRecord().query(context)
 
@@ -70,9 +69,7 @@ class DiscoveryHandler(BaseHandler):
 
 class DiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        self._logger.debug("SERVICES DISCOVERY RESPONSE %s, ", context)
-        assert isinstance(context.message, DiscoveryResponse)
-
+        debug_handler(self._logger.debug, context, DiscoveryResponse)
         connection_id = context.connection_record.connection_id
 
         await responder.send_webhook(
@@ -139,12 +136,9 @@ class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
 
 class DEBUGDiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        storage: BaseStorage = await context.inject(
-            BaseStorage,
-        )
+        debug_handler(self._logger.debug, context, DEBUGDiscovery)
 
-        assert isinstance(context.message, DEBUGDiscovery)
-
+        storage: BaseStorage = await context.inject(BaseStorage)
         query = await ServiceRecord().query(context)
 
         records = []
@@ -167,7 +161,7 @@ class DEBUGDiscoveryHandler(BaseHandler):
 
 class DEBUGDiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
-        assert isinstance(context.message, DEBUGDiscoveryResponse)
+        debug_handler(self._logger.debug, context, DEBUGDiscoveryResponse)
 
         connection_id = context.connection_record.connection_id
 

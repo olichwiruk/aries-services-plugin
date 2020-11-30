@@ -3,7 +3,10 @@ import logging
 import functools
 from datetime import datetime, timezone
 from dateutil.parser import isoparse
+from aiohttp import web
 
+from aries_cloudagent.storage.base import BaseStorage
+from aries_cloudagent.storage.error import *
 from aries_cloudagent.messaging.agent_message import AgentMessage, AgentMessageSchema
 from aries_cloudagent.messaging.base_handler import (
     BaseHandler,
@@ -11,16 +14,40 @@ from aries_cloudagent.messaging.base_handler import (
     RequestContext,
 )
 
-# from aries_cloudagent.protocols.problem_report.v1_0.message import ProblemReport
+from .issue.models import ServiceIssueRecord
+from .models import ServiceRecord
 
 
-def assert_items_are_not_none(*arguments):
-    """
-    Iterate through all the parameters that were passed to this function and assert that
-    they are not None
-    """
-    for item in arguments:
-        assert item is not None
+async def retrieve_service_issue(context, issue_id):
+    try:
+        issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+            context, issue_id
+        )
+    except StorageNotFoundError as err:
+        raise web.HTTPNotFound(
+            reason=f"Service Issue with ID {issue_id} not found {err.roll_up}"
+        )
+    except StorageError as err:
+        raise web.HTTPInternalServerError(
+            reason=f"Oops: This was not supposed to happen, ID: {issue_id}, Error: {err.roll_up}"
+        )
+
+    return issue
+
+
+async def retrieve_service(context, service_id):
+    try:
+        service: ServiceRecord = await ServiceRecord.retrieve_by_id(context, service_id)
+    except StorageNotFoundError as err:
+        raise web.HTTPNotFound(
+            reason=f"Service Record with ID {service_id} not found {err.roll_up}"
+        )
+    except StorageError as err:
+        raise web.HTTPInternalServerError(
+            reason=f"Oops: This was not supposed to happen, ID: {service_id}, Error: {err.roll_up}"
+        )
+
+    return service
 
 
 def generic_init(instance, **kwargs):
@@ -54,7 +81,7 @@ def generate_model_schema(
     AgentMessageSchemas).
 
     Example:
-    
+
     RecordsGet, RecordsGetSchema = generate_model_schema(
         name="RecordsGet",
         handler=RECORDS_GET_HANDLER,
@@ -124,4 +151,3 @@ def generate_model_schema(
     Schema._declared_fields.update(schema_dict)
 
     return Model, Schema
-

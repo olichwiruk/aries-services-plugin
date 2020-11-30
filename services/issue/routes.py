@@ -11,7 +11,7 @@ from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
 from aries_cloudagent.holder.base import BaseHolder, HolderError
 
 from aiohttp import web
-from aiohttp_apispec import docs, request_schema
+from aiohttp_apispec import docs, request_schema, match_info_schema
 
 from marshmallow import fields, Schema
 import logging
@@ -23,16 +23,26 @@ from asyncio import shield
 from .models import *
 from .message_types import *
 from ..models import *
+from ..consents.models.given_consent import ConsentGivenRecord
 from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.pdstorage_thcf.api import *
+from aries_cloudagent.protocols.issue_credential.v1_1.messages.credential_request import (
+    CredentialRequest,
+)
+from aries_cloudagent.protocols.issue_credential.v1_1.utils import (
+    create_credential,
+    retrieve_connection,
+)
+
+from ..util import retrieve_service, retrieve_service_issue
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ApplySchema(Schema):
     connection_id = fields.Str(required=True)
-    payload = fields.Str(required=True)
+    user_data = fields.Str(required=True)
     service = fields.Nested(DiscoveryServiceSchema())
 
 
@@ -51,14 +61,17 @@ class GetIssueSchema(Schema):
     connection_id = fields.Str(required=False)
 
 
-class GetIssueSelfSchema(Schema):
-    issue_id = fields.Str(required=False)
+class GetIssueFilteredSchema(Schema):
     connection_id = fields.Str(required=False)
     exchange_id = fields.Str(required=False)
     service_id = fields.Str(required=False)
     label = fields.Str(required=False)
     author = fields.Str(required=False)
     state = fields.Str(required=False)
+
+
+class GetIssueByIdSchema(Schema):
+    issue_id = fields.Str(required=True)
 
 
 class ProcessApplicationSchema(Schema):
@@ -79,139 +92,98 @@ class ProcessApplicationSchema(Schema):
 @request_schema(ApplySchema())
 async def apply(request: web.BaseRequest):
     context = request.app["request_context"]
-    params = await request.json()
     outbound_handler = request.app["outbound_message_router"]
 
+    params = await request.json()
     connection_id = params["connection_id"]
-    payload = params["payload"]
-
+    service_user_data = params["user_data"]
     service_id = params["service"]["service_id"]
     consent_schema = params["service"]["consent_schema"]
     service_schema = params["service"]["service_schema"]
     label = params["service"]["label"]
 
-    try:
-        connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound(reason="Connection not found")
-
-    #
-    # NOTE(KKrzosa): Send a credential offer for consent to the other agent
-    # TODO(KKrzosa): Cache the credential definition
-    #
-
-    ledger: BaseLedger = await context.inject(BaseLedger)
+    connection = await retrieve_connection(context, connection_id)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
-    try:
-        # NOTE: Register Schema on LEDGER
-        async with ledger:
-            schema_id, schema_definition = await shield(
-                ledger.create_and_send_schema(
-                    issuer,
-                    "consent_schema",
-                    "1.0",
-                    [
-                        "oca_schema_dri",
-                        "oca_schema_namespace",
-                        "data_dri",
-                        "service_consent_match_id",
-                    ],
-                )
-            )
-            LOGGER.info("OK consent schema saved on ledger! %s", schema_id)
+    """
 
-    except (LedgerError, IssuerError, IndyError) as err:
-        LOGGER.error(
-            "create_and_send_schema error! %s",
-            err,
-        )
-        raise web.HTTPError(reason="Ledger error, create_and_send_schema error")
+    Issue consent credential for service provider
 
-    try:
-        # TODO: Error here with unpacking it returns a dict now
-        # NOTE: Register Credential DEFINITION on LEDGER
-        async with ledger:
-            credential_definition_id, credential_definition, novel = await shield(
-                ledger.create_and_send_credential_definition(
-                    issuer,
-                    schema_id,
-                    signature_type=None,
-                    tag="consent_schema",
-                )
-            )
-            LOGGER.info(
-                "OK consent_schema CREDENTIAL DEFINITION saved on ledger! %s",
-                credential_definition_id,
-            )
-    except (LedgerError, IssuerError, IndyError) as err:
-        LOGGER.error(
-            "create_and_send_credential_definition error! %s",
-            err,
-        )
-        raise web.HTTPError(
-            reason="Ledger error, create_and_send_credential_definition error"
-        )
+    """
 
-    # NOTE: Create credential OFFER
-    (
-        credential_exchange_record,
-        credential_offer_message,
-        service_consent_match_id,
-    ) = await create_consent_credential_offer(
-        context=context,
-        cred_def_id=credential_definition_id,
-        connection_id=connection_id,
-        consent_schema=consent_schema,
-        auto_issue=True,
-        auto_remove=False,
+    service_consent_match_id = str(uuid.uuid4())
+    credential = await create_credential(
+        context,
+        {
+            "credential_values": {
+                "oca_schema_dri": consent_schema["oca_schema_dri"],
+                "oca_schema_namespace": consent_schema["oca_schema_namespace"],
+                "data_dri": consent_schema["data_dri"],
+                "service_consent_match_id": service_consent_match_id,
+            }
+        },
+        connection,
+        exception=web.HTTPError,
     )
 
-    if connection.is_ready:
-        await outbound_handler(credential_offer_message, connection_id=connection_id)
+    metadata = { "oca_schema_dri": service_schema["oca_schema_dri"]}
+    service_user_data_dri = await save_string(context, service_user_data, json.dumps(metadata))
 
-        metadata = { "oca_schema_dri": service_schema["oca_schema_dri"] }
-        payload_dri = await save_string(context, payload, json.dumps(metadata))
-        record = ServiceIssueRecord(
-            connection_id=connection_id,
-            state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
-            author=ServiceIssueRecord.AUTHOR_SELF,
-            service_id=service_id,
-            label=label,
-            consent_schema=consent_schema,
-            service_schema=service_schema,
-            payload_dri=payload_dri,
-            credential_definition_id=credential_exchange_record.credential_definition_id,
-            service_consent_match_id=service_consent_match_id,
-        )
-
-        data_dri = await record.save(context)
-
-        request = Application(
-            service_id=record.service_id,
-            exchange_id=record.exchange_id,
-            credential_definition_id=credential_exchange_record.credential_definition_id,
-            data_dri=data_dri,
-            service_consent_match_id=service_consent_match_id,
-        )
-        await outbound_handler(request, connection_id=connection_id)
-        return web.json_response(request.serialize())
-
-    raise web.HTTPBadGateway
+    record = ServiceIssueRecord(
+        connection_id=connection_id,
+        state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
+        author=ServiceIssueRecord.AUTHOR_SELF,
+        label=label,
+        consent_schema=consent_schema,
+        service_id=service_id,
+        service_schema=service_schema,
+        service_user_data_dri=service_user_data_dri,
+        service_consent_match_id=service_consent_match_id,
+    )
+    
+    await record.save(context)
 
 
-# TODO: Connection record, connection ready
-class StatusConfirmer:
-    def __init__(self, outbound_handler, connection_id, exchange_id):
-        self.outbound_handler = outbound_handler
-        self.connection_id = connection_id
-        self.exchange_id = exchange_id
+    """ 
+    NOTE: service_user_data_dri - is here so that in the future it would be easier
+          to not send the service_user_data, because from what I understand we only
+          want to send that to the other party under certain conditions
 
-    async def send_confirmation(self, state):
-        confirmation = Confirmation(exchange_id=self.exchange_id, state=state)
-        await self.outbound_handler(confirmation, connection_id=self.connection_id)
+          dri is used only to make sure DRI's are the same 
+          when I store the data in other's agent PDS
+    """
+
+    request = Application(
+        service_id=record.service_id,
+        exchange_id=record.exchange_id,
+        service_user_data=service_user_data,
+        service_user_data_dri=service_user_data_dri,
+        service_consent_match_id=service_consent_match_id,
+        consent_credential=credential,
+    )
+    await outbound_handler(request, connection_id=connection_id)
+
+    """
+
+    record the given credential
+
+    """
+
+    consent_given_record = ConsentGivenRecord(
+        consent_user_data_dri=consent_schema["data_dri"],
+        connection_id=connection_id,
+        credential=credential,
+        service_consent_match_id=service_consent_match_id,
+    )
+
+    await consent_given_record.save(context)
+
+    return web.json_response(request.serialize())
+
+
+async def send_confirmation(outbound_handler, connection_id, exchange_id, state):
+    confirmation = Confirmation(exchange_id=exchange_id, state=state)
+    await outbound_handler(confirmation, connection_id=connection_id)
 
 
 @docs(
@@ -231,142 +203,61 @@ async def process_application(request: web.BaseRequest):
     outbound_handler = request.app["outbound_message_router"]
     context = request.app["request_context"]
     params = await request.json()
+    issue_id = params["issue_id"]
 
-    REJECTED = ServiceIssueRecord.ISSUE_REJECTED
-    LEDGER_ERROR = ServiceIssueRecord.ISSUE_SERVICE_LEDGER_ERROR
-    ACCEPTED = ServiceIssueRecord.ISSUE_ACCEPTED
+    issue: ServiceIssueRecord = await retrieve_service_issue(context, issue_id)
+    exchange_id = issue.exchange_id
+    connection_id = issue.connection_id
 
-    try:
-        issue: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
-            context, params["issue_id"]
-        )
-        service: ServiceRecord = await ServiceRecord.retrieve_by_id(
-            context, issue.service_id
-        )
-    except StorageNotFoundError as err:
-        raise web.HTTPNotFound(
-            reason="Issue not found or service for issue has invalid id" + err
-        )
+    service: ServiceRecord = await retrieve_service(context, issue.service_id)
+    connection: ConnectionRecord = await retrieve_connection(context, connection_id)
 
-    confirmer = StatusConfirmer(
-        outbound_handler, issue.connection_id, issue.exchange_id
-    )
+    """
 
-    if params["decision"] == "reject" or issue.state == REJECTED:
-        issue.state = REJECTED
+    Users can decide to reject the application
+
+    """
+
+    if (
+        params["decision"] == "reject"
+        or issue.state == ServiceIssueRecord.ISSUE_REJECTED
+    ):
+        issue.state = ServiceIssueRecord.ISSUE_REJECTED
         await issue.save(context, reason="Issue reject saved")
-        await confirmer.send_confirmation(issue.state)
+        await send_confirmation(
+            outbound_handler, connection_id, exchange_id, issue.state
+        )
         return web.json_response(issue.serialize())
 
-    holder = await context.inject(BaseHolder)
+    """
 
-    #
-    # NOTE(KKrzosa): Validate the state of the issue and
-    #                check if credential is correct
-    # TODO(KKrzosa): inform about invalid credential
-    #
+    Create a service credential with values from the applicant
 
-    service_namespace = service.consent_schema["oca_schema_namespace"]
-    service_dri = service.consent_schema["oca_schema_dri"]
-    service_data_dri = service.consent_schema["data_dri"]
+    """
 
-    # NOTE(KKrzosa): Search for a consent credential
-    iterator = 0
-    found_credential = None
-    credential_list = None
-    while credential_list != []:
-        credential_list = await holder.get_credentials(
-            iterator,
-            iterator + 100,
-            {"cred_def_id": issue.credential_definition_id},
-        )
+    credential = await create_credential(
+        context,
+        {
+            "credential_values": {
+                "oca_schema_dri": service.service_schema["oca_schema_dri"],
+                "oca_schema_namespace": service.service_schema["oca_schema_namespace"],
+                "data_dri": issue.service_user_data_dri,
+                "service_consent_match_id": issue.service_consent_match_id,
+            }
+        },
+        connection,
+        exception=web.HTTPError,
+    )
 
-        # NOTE(Krzosa): search through queried credentials chunk for the credential that
-        # matches the service credential
-        break_the_outer_loop = False
-        for credential in credential_list:
-            if (
-                credential["attrs"]["data_dri"] == service_data_dri
-                and credential["attrs"]["oca_schema_namespace"] == service_namespace
-                and credential["attrs"]["oca_schema_dri"] == service_dri
-                and credential["attrs"]["service_consent_match_id"]
-                == issue.service_consent_match_id
-            ):
-                found_credential = credential
-
-                # NOTE(KKrzosa): break inner and outer loop
-                break_the_outer_loop = True
-                break
-
-        # NOTE(KKrzosa): if the record got found -> break the while loop
-        if break_the_outer_loop:
-            break
-
-        iterator += 100
-
-    if found_credential == None:
-        raise web.HTTPNotFound(reason="Credential for consent not found")
-
-    #
-    # NOTE(KKrzosa): Create a schema and credential def but only if they dont exist
-    #                 and based on those issue a credential
-    #
-
-    service_manager: ServiceManager = await create_service_manager(context, service)
-
-    try:
-        await service_manager.create_schema()
-        await service_manager.create_credential_definition()
-        (
-            credential_exchange_record,
-            credential_offer_message,
-        ) = await service_manager.create_credential_offer(
-            connection_id=issue.connection_id,
-            preview_spec={
-                "@type": "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/issue-credential/1.0/credential-preview",
-                "attributes": [
-                    {
-                        "name": "oca_schema_dri",
-                        "mime-type": "application/json",
-                        "value": service.service_schema["oca_schema_dri"],
-                    },
-                    {
-                        "name": "data_dri",
-                        "mime-type": "application/json",
-                        "value": issue.payload_dri,
-                    },
-                    {
-                        "name": "oca_schema_namespace",
-                        "mime-type": "application/json",
-                        "value": service.service_schema["oca_schema_namespace"],
-                    },
-                    {
-                        "name": "service_consent_match_id",
-                        "mime-type": "application/json",
-                        "value": issue.service_consent_match_id,
-                    },
-                ],
-            },
-            auto_issue=True,
-            auto_remove=False,
-        )
-    except (LedgerError, IssuerError, BadLedgerRequestError) as err:
-        LOGGER.error(
-            "credential offer creation error! %s",
-            err,
-        )
-        issue.state = LEDGER_ERROR
-        raise web.HTTPError(reason="Ledger error, credential offer creation error")
-
-    issue.state = ACCEPTED
+    issue.state = ServiceIssueRecord.ISSUE_ACCEPTED
     await issue.save(context, reason="Accepted service issue, credential offer created")
 
-    await confirmer.send_confirmation(issue.state)
-    await outbound_handler(credential_offer_message, connection_id=issue.connection_id)
+    resp = ApplicationResponse(credential=credential, exchange_id=exchange_id)
+    await outbound_handler(resp, connection_id=connection_id)
     return web.json_response(
         {
-            "issue": issue.serialize(),
-            "credential_exchange_record": credential_exchange_record.serialize(),
+            "issue_id": issue._id,
+            "connection_id": connection_id,
         }
     )
 
@@ -377,9 +268,6 @@ async def process_application(request: web.BaseRequest):
     description="""
     You don't need to fill any of this, all the filters are optional
     make sure to delete ones you dont use
-
-    IMPORTANT: when issue_id is passed, all other fields are IGNORED!
-    issue_id == data_dri
 
     STATES: 
     "pending" - not processed yet (not rejected or accepted)
@@ -394,52 +282,35 @@ async def process_application(request: web.BaseRequest):
     "self"
     "other"
 
-    This endpoint under the hood calls all the agents that we have 
-    uncomplete information about and requests the uncomplete information (payload)
-    that information can be retrieved on the next call to get-issue-self
-
     """,
 )
-@request_schema(GetIssueSelfSchema())
+@request_schema(GetIssueFilteredSchema())
 async def get_issue_self(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
 
-    # TODO: Under the hood payload change notification
-    # ERROR:
-    if "issue_id" in params and params["issue_id"] != None:
-        try:
-            query = [
-                await ServiceIssueRecord.retrieve_by_id(context, params["issue_id"])
-            ]
-        except StorageNotFoundError:
-            raise web.HTTPNotFound
-    else:
-        try:
-            query = await ServiceIssueRecord.query(context, tag_filter=params)
-        except StorageNotFoundError:
-            raise web.HTTPNotFound
+    try:
+        query = await ServiceIssueRecord.query(context, tag_filter=params)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
 
     result = []
     for i in query:
         record: dict = i.serialize()
 
-        # NOTE(Krzosa): request additional information from the agent
-        # that we had this interaction with
-        if i.payload_dri == None:
-            request = GetIssue(exchange_id=i.exchange_id)
-            await outbound_handler(request, connection_id=i.connection_id)
+        """
+        Serialize additional fields which are not serializable
+        by default (information that is in PDS)
+        """
 
-        # NOTE(Krzosa): serialize additional fields which are not serializable
-        # by default
-        payload = await load_string(context, i.payload_dri)
+        service_user_data = await load_string(context, i.service_user_data_dri)
 
         record.update(
             {
                 "issue_id": i._id,
                 "label": i.label,
-                "payload": payload,
+                "service_user_data": service_user_data,
                 "service_schema": json.dumps(i.service_schema),
                 "consent_schema": json.dumps(i.consent_schema),
             }
@@ -451,19 +322,40 @@ async def get_issue_self(request: web.BaseRequest):
 
 @docs(
     tags=["Verifiable Services"],
-    summary="Get state of a service issue",
-    description="""
-    You can filter issues by:
-        service_id
-        connection_id
-        exchange_id (id of a group of issue messages)
-
-    This returns a list, you can exclude a filter just by not including it
-    so if you dont want to search by exchange_id make sure to only include:
-        {"connection_id": "123", "service_id": "1234"}
-    """,
+    summary="Search for issue by id",
 )
-@request_schema(ApplyStatusSchema())
+@match_info_schema(GetIssueByIdSchema())
+async def get_issue_by_id(request: web.BaseRequest):
+    context = request.app["request_context"]
+    issue_id = request.match_info["issue_id"]
+
+    try:
+        query = await ServiceIssueRecord.retrieve_by_id(context, issue_id)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    record: dict = query.serialize()
+
+    """
+    Serialize additional fields which are not serializable
+    by default (information that is in PDS)
+    """
+
+    service_user_data = await load_string(context, query.service_user_data_dri)
+
+    record.update(
+        {
+            "issue_id": query._id,
+            "label": query.label,
+            "service_user_data": service_user_data,
+            "service_schema": json.dumps(query.service_schema),
+            "consent_schema": json.dumps(query.consent_schema),
+        }
+    )
+
+    return web.json_response(record)
+
+
 async def DEBUGapply_status(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
