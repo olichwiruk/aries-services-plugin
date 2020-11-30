@@ -70,6 +70,6 @@ async def get_consents_given(request: web.BaseRequest):
 
     all_consents = await ConsentGivenRecord.query(context, {})
     serialized = [i.serialize() for i in all_consents]
-    serialized["credential"] = json.loads(serialized["credential"])
+    # serialized["credential"] = json.loads(serialized["credential"])
 
     return web.json_response({"success": True, "result": serialized})

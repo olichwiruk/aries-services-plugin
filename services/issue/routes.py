@@ -11,7 +11,7 @@ from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
 from aries_cloudagent.holder.base import BaseHolder, HolderError
 
 from aiohttp import web
-from aiohttp_apispec import docs, request_schema
+from aiohttp_apispec import docs, request_schema, match_info_schema
 
 from marshmallow import fields, Schema
 import logging
@@ -61,14 +61,17 @@ class GetIssueSchema(Schema):
     connection_id = fields.Str(required=False)
 
 
-class GetIssueSelfSchema(Schema):
-    issue_id = fields.Str(required=False)
+class GetIssueFilteredSchema(Schema):
     connection_id = fields.Str(required=False)
     exchange_id = fields.Str(required=False)
     service_id = fields.Str(required=False)
     label = fields.Str(required=False)
     author = fields.Str(required=False)
     state = fields.Str(required=False)
+
+
+class GetIssueByIdSchema(Schema):
+    issue_id = fields.Str(required=True)
 
 
 class ProcessApplicationSchema(Schema):
@@ -209,7 +212,7 @@ async def process_application(request: web.BaseRequest):
 
     """
 
-    User can decide to reject the application, this is a check for that
+    Users can decide to reject the application
 
     """
 
@@ -264,9 +267,6 @@ async def process_application(request: web.BaseRequest):
     You don't need to fill any of this, all the filters are optional
     make sure to delete ones you dont use
 
-    IMPORTANT: when issue_id is passed, all other fields are IGNORED!
-    issue_id == data_dri
-
     STATES: 
     "pending" - not processed yet (not rejected or accepted)
     "no response" - agent didn't respond at all yet
@@ -280,30 +280,18 @@ async def process_application(request: web.BaseRequest):
     "self"
     "other"
 
-    This endpoint under the hood calls all the agents that we have 
-    uncomplete information about and requests the uncomplete information (payload)
-    that information can be retrieved on the next call to get-issue-self
-
     """,
 )
-@request_schema(GetIssueSelfSchema())
+@request_schema(GetIssueFilteredSchema())
 async def get_issue_self(request: web.BaseRequest):
     context = request.app["request_context"]
     outbound_handler = request.app["outbound_message_router"]
     params = await request.json()
 
-    if "issue_id" in params and params["issue_id"] != None:
-        try:
-            query = [
-                await ServiceIssueRecord.retrieve_by_id(context, params["issue_id"])
-            ]
-        except StorageNotFoundError:
-            raise web.HTTPNotFound
-    else:
-        try:
-            query = await ServiceIssueRecord.query(context, tag_filter=params)
-        except StorageNotFoundError:
-            raise web.HTTPNotFound
+    try:
+        query = await ServiceIssueRecord.query(context, tag_filter=params)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
 
     result = []
     for i in query:
@@ -328,6 +316,42 @@ async def get_issue_self(request: web.BaseRequest):
         result.append(record)
 
     return web.json_response(result)
+
+
+@docs(
+    tags=["Verifiable Services"],
+    summary="Search for issue by id",
+)
+@match_info_schema(GetIssueByIdSchema())
+async def get_issue_by_id(request: web.BaseRequest):
+    context = request.app["request_context"]
+    issue_id = request.match_info["issue_id"]
+
+    try:
+        query = await ServiceIssueRecord.retrieve_by_id(context, issue_id)
+    except StorageNotFoundError:
+        raise web.HTTPNotFound
+
+    record: dict = query.serialize()
+
+    """
+    Serialize additional fields which are not serializable
+    by default (information that is in PDS)
+    """
+
+    service_user_data = await load_string(context, query.service_user_data_dri)
+
+    record.update(
+        {
+            "issue_id": query._id,
+            "label": query.label,
+            "service_user_data": service_user_data,
+            "service_schema": json.dumps(query.service_schema),
+            "consent_schema": json.dumps(query.consent_schema),
+        }
+    )
+
+    return web.json_response(record)
 
 
 async def DEBUGapply_status(request: web.BaseRequest):

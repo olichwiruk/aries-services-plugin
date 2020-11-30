@@ -54,9 +54,9 @@ class ServiceRecord(BaseRecord):
         ledger_credential_definition_id: str = None,
         state: str = None,
         record_id: str = None,
-        **keywordArgs,
+        **keyword_args,
     ):
-        super().__init__(record_id, state, **keywordArgs)
+        super().__init__(record_id, state, **keyword_args)
         self.consent_schema = consent_schema
         self.service_schema = service_schema
         self.label = label
