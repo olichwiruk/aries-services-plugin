@@ -2,10 +2,6 @@ from aries_cloudagent.connections.models.connection_record import ConnectionReco
 from aries_cloudagent.messaging.valid import UUIDFour
 from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
 
-from aries_cloudagent.ledger.error import LedgerError
-from aries_cloudagent.indy.error import IndyError
-from aries_cloudagent.ledger.error import BadLedgerRequestError
-from aries_cloudagent.ledger.base import BaseLedger
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
 from aries_cloudagent.holder.base import BaseHolder, HolderError
@@ -38,45 +34,13 @@ from aries_cloudagent.protocols.issue_credential.v1_1.utils import (
 from ..util import retrieve_service, retrieve_service_issue
 
 LOGGER = logging.getLogger(__name__)
+MY_SERVICE_DATA_TABLE = "my_service_data_table"
 
 
 class ApplySchema(Schema):
     connection_id = fields.Str(required=True)
     user_data = fields.Str(required=True)
     service = fields.Nested(DiscoveryServiceSchema())
-
-
-class ApplyStatusSchema(Schema):
-    service_id = fields.Str(required=False)
-    connection_id = fields.Str(required=False)
-    exchange_id = fields.Str(required=False)
-
-
-class GetCredentialDataSchema(Schema):
-    data_dri = fields.Str(required=False)
-
-
-class GetIssueSchema(Schema):
-    exchange_id = fields.Str(required=False)
-    connection_id = fields.Str(required=False)
-
-
-class GetIssueFilteredSchema(Schema):
-    connection_id = fields.Str(required=False)
-    exchange_id = fields.Str(required=False)
-    service_id = fields.Str(required=False)
-    label = fields.Str(required=False)
-    author = fields.Str(required=False)
-    state = fields.Str(required=False)
-
-
-class GetIssueByIdSchema(Schema):
-    issue_id = fields.Str(required=True)
-
-
-class ProcessApplicationSchema(Schema):
-    issue_id = fields.Str(required=True)
-    decision = fields.Str(required=True)
 
 
 @docs(
@@ -126,8 +90,13 @@ async def apply(request: web.BaseRequest):
         exception=web.HTTPError,
     )
 
-    metadata = { "oca_schema_dri": service_schema["oca_schema_dri"]}
-    service_user_data_dri = await save_string(context, service_user_data, json.dumps(metadata))
+    metadata = {
+        "oca_schema_dri": service_schema["oca_schema_dri"],
+        "table": MY_SERVICE_DATA_TABLE,
+    }
+    service_user_data_dri = await save_string(
+        context, service_user_data, json.dumps(metadata)
+    )
 
     record = ServiceIssueRecord(
         connection_id=connection_id,
@@ -140,9 +109,8 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
     )
-    
-    await record.save(context)
 
+    await record.save(context)
 
     """ 
     NOTE: service_user_data_dri - is here so that in the future it would be easier
@@ -152,6 +120,8 @@ async def apply(request: web.BaseRequest):
           dri is used only to make sure DRI's are the same 
           when I store the data in other's agent PDS
     """
+    pds = await pds_get_own_your_data(context)
+    pds_usage_policy = await pds.get_usage_policy()
 
     request = Application(
         service_id=record.service_id,
@@ -160,6 +130,7 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
         consent_credential=credential,
+        usage_policy=pds_usage_policy,
     )
     await outbound_handler(request, connection_id=connection_id)
 
@@ -184,6 +155,11 @@ async def apply(request: web.BaseRequest):
 async def send_confirmation(outbound_handler, connection_id, exchange_id, state):
     confirmation = Confirmation(exchange_id=exchange_id, state=state)
     await outbound_handler(confirmation, connection_id=connection_id)
+
+
+class ProcessApplicationSchema(Schema):
+    issue_id = fields.Str(required=True)
+    decision = fields.Str(required=True)
 
 
 @docs(
@@ -262,6 +238,15 @@ async def process_application(request: web.BaseRequest):
     )
 
 
+class GetIssueFilteredSchema(Schema):
+    connection_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
+    service_id = fields.Str(required=False)
+    label = fields.Str(required=False)
+    author = fields.Str(required=False)
+    state = fields.Str(required=False)
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Search for issue by a specified tag",
@@ -272,9 +257,6 @@ async def process_application(request: web.BaseRequest):
     STATES: 
     "pending" - not processed yet (not rejected or accepted)
     "no response" - agent didn't respond at all yet
-    "service not found"
-    "ledger error"
-    "cred prep complete"
     "rejected"
     "accepted"
 
@@ -318,6 +300,10 @@ async def get_issue_self(request: web.BaseRequest):
         result.append(record)
 
     return web.json_response(result)
+
+
+class GetIssueByIdSchema(Schema):
+    issue_id = fields.Str(required=True)
 
 
 @docs(

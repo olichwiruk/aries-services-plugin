@@ -49,9 +49,7 @@ class ServiceRecord(BaseRecord):
         label: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
-        # those usually are created later
-        ledger_schema_id: str = None,
-        ledger_credential_definition_id: str = None,
+        appliance_policy: str = None,
         state: str = None,
         record_id: str = None,
         **keyword_args,
@@ -59,9 +57,8 @@ class ServiceRecord(BaseRecord):
         super().__init__(record_id, state, **keyword_args)
         self.consent_schema = consent_schema
         self.service_schema = service_schema
+        self.appliance_policy = appliance_policy
         self.label = label
-        self.ledger_schema_id = ledger_schema_id
-        self.ledger_credential_definition_id = ledger_credential_definition_id
 
     @property
     def record_value(self) -> dict:
@@ -72,8 +69,7 @@ class ServiceRecord(BaseRecord):
                 "service_schema",
                 "consent_schema",
                 "label",
-                "ledger_schema_id",
-                "ledger_credential_definition_id",
+                "appliance_policy",
             )
         }
 
@@ -90,5 +86,4 @@ class ServiceRecordSchema(BaseRecordSchema):
     service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
-    ledger_schema_id = (fields.Str(required=False),)
-    ledger_credential_definition_id = (fields.Str(required=False),)
+    appliance_policy = fields.Str(required=True)

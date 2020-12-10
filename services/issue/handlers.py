@@ -34,8 +34,10 @@ import json
 
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.aathcf.utils import debug_handler
+from ..util import verify_usage_policy
 
 LOGGER = logging.getLogger(__name__)
+SERVICE_USER_DATA_TABLE = "service_user_data_table"
 
 
 async def send_confirmation(context, responder, exchange_id, state=None):
@@ -96,6 +98,20 @@ class ApplicationHandler(BaseHandler):
             or cred_content["oca_schema_dri"] != oca_dri
         )
 
+        """
+
+        """
+
+        usage_policy_message = await verify_usage_policy(
+            context.message.usage_policy, service.appliance_policy
+        )
+        if usage_policy_message.find("policies match") == -1:
+            is_malformed = true
+
+        """
+
+        """
+
         if is_malformed:
             await send_confirmation(
                 context,
@@ -128,7 +144,7 @@ class ApplicationHandler(BaseHandler):
 
         """
 
-        metadata = {"oca_schema_dri": oca_dri}
+        metadata = {"oca_schema_dri": oca_dri, "table": SERVICE_USER_DATA_TABLE}
         user_data_dri = await save_string(
             context, context.message.service_user_data, json.dumps(metadata)
         )

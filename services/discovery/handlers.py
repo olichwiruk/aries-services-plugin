@@ -29,7 +29,9 @@ import hashlib
 import uuid
 import json
 
+from ..util import verify_usage_policy
 from aries_cloudagent.pdstorage_thcf.api import *
+from aries_cloudagent.pdstorage_thcf.api import pds_get_own_your_data
 from aries_cloudagent.aathcf.utils import debug_handler
 
 
@@ -50,10 +52,10 @@ class DiscoveryHandler(BaseHandler):
             )
             if consent_schema_data != None:
                 consent_schema["data"] = consent_schema_data
-            print('consent_schema.get("data")', consent_schema.get("data"))
 
             record = record.dump(
                 {
+                    "appliance_policy": service.appliance_policy,
                     "service_schema": service.service_schema,
                     "consent_schema": consent_schema,
                     "service_id": service._id,
@@ -72,9 +74,20 @@ class DiscoveryResponseHandler(BaseHandler):
         debug_handler(self._logger.debug, context, DiscoveryResponse)
         connection_id = context.connection_record.connection_id
 
+        services = context.message.services
+        pds = await pds_get_own_your_data(context)
+        pds_usage_policy = await pds.get_usage_policy()
+        for i in services:
+            i["policy_validation"] = await verify_usage_policy(
+                pds_usage_policy, i["appliance_policy"]
+            )
+            i.pop("appliance_policy", None)
+
+        print(json.dumps(services))
+
         await responder.send_webhook(
             "verifiable-services/request-service-list",
-            {"services": json.dumps(context.message.services)},
+            {"services": json.dumps(services)},
         )
 
 
@@ -130,7 +143,7 @@ class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
     class Meta:
         model_class = "DEBUGServiceDiscoveryRecord"
 
-    services = fields.List(fields.Nested(ServiceRecordSchema()))
+    services = fields.List(fields.Dict())
     connection_id = fields.Str()
 
 
@@ -146,6 +159,7 @@ class DEBUGDiscoveryHandler(BaseHandler):
             record = DiscoveryServiceSchema()
             record = record.dump(
                 {
+                    "appliance_policy": service.appliance_policy,
                     "service_schema": service.service_schema,
                     "consent_schema": service.consent_schema,
                     "service_id": service._id,
@@ -162,7 +176,6 @@ class DEBUGDiscoveryHandler(BaseHandler):
 class DEBUGDiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, DEBUGDiscoveryResponse)
-
         connection_id = context.connection_record.connection_id
 
         try:
@@ -178,4 +191,12 @@ class DEBUGDiscoveryResponseHandler(BaseHandler):
 
         if context.message.services != []:
             assert record.services != []
+
+        pds = await pds_get_own_your_data(context)
+        pds_usage_policy = await pds.get_usage_policy()
+        for i in record.services:
+            i["policy_validation"] = await verify_usage_policy(
+                pds_usage_policy, i["appliance_policy"]
+            )
+
         await record.save(context)

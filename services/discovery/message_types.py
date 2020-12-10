@@ -34,6 +34,7 @@ class DiscoveryServiceSchema(Schema):
     service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
+    appliance_policy = fields.Str(required=True)
 
 
 class DiscoveryResponse(AgentMessage):

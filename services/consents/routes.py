@@ -9,6 +9,8 @@ from ..models import OcaSchema
 from .models.defined_consent import DefinedConsentRecord
 from .models.given_consent import ConsentGivenRecord
 
+CONSENTS_TABLE = "consents"
+
 
 class AddConsentSchema(Schema):
     label = fields.Str(required=True)
@@ -32,8 +34,13 @@ async def add_consent(request: web.BaseRequest):
     if errors:
         return web.json_response({"success": False, "errors": errors})
     else:
-        metadata = { "oca_schema_dri": params["oca_schema"]["dri"] }
-        payload_dri = await save_string(context, json.dumps(params["payload"]), json.dumps(metadata))
+        metadata = {
+            "oca_schema_dri": params["oca_schema"]["dri"],
+            "table": CONSENTS_TABLE,
+        }
+        payload_dri = await save_string(
+            context, json.dumps(params["payload"]), json.dumps(metadata)
+        )
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
