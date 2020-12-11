@@ -19,9 +19,6 @@ from .models import ServiceRecord
 
 
 async def verify_usage_policy(controller_usage_policy, subject_usage_policy):
-    print("Controller_usage_policy:", controller_usage_policy)
-    print("Subject_usage_policy:", subject_usage_policy)
-
     async with ClientSession() as session:
         result = await session.post(
             "https://governance.ownyourdata.eu/api/usage-policy/match",

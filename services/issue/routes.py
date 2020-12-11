@@ -86,7 +86,6 @@ async def apply(request: web.BaseRequest):
                 "service_consent_match_id": service_consent_match_id,
             }
         },
-        connection,
         exception=web.HTTPError,
     )
 
@@ -149,7 +148,9 @@ async def apply(request: web.BaseRequest):
 
     await consent_given_record.save(context)
 
-    return web.json_response(request.serialize())
+    return web.json_response(
+        {"success": "application_sent", "exchange_id": record.exchange_id}
+    )
 
 
 async def send_confirmation(outbound_handler, connection_id, exchange_id, state):

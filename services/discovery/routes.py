@@ -65,7 +65,7 @@ async def add_service(request: web.BaseRequest):
     except StorageDuplicateError:
         service_record = ServiceRecord().retrieve_by_id(context)
 
-    return web.json_response(service_record.serialize())
+    return web.json_response({"service_id": hash_id})
 
 
 @docs(
