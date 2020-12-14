@@ -17,6 +17,7 @@ class DefinedConsentRecord(BaseRecord):
         label: str = None,
         oca_schema: OcaSchema = None,
         payload_dri: str = None,
+        usage_policy: str = None,
         state: str = None,
         record_id: str = None,
         **keyword_args,
@@ -25,12 +26,14 @@ class DefinedConsentRecord(BaseRecord):
         self.label = label
         self.oca_schema = oca_schema
         self.payload_dri = payload_dri
+        self.usage_policy = usage_policy
 
     @property
     def record_value(self) -> dict:
         """Accessor to for the JSON record value properties"""
         return {
-            prop: getattr(self, prop) for prop in ("label", "oca_schema", "payload_dri")
+            prop: getattr(self, prop)
+            for prop in ("usage_policy", "label", "oca_schema", "payload_dri")
         }
 
     @property
@@ -45,3 +48,4 @@ class DefinedConsentRecordSchema(BaseRecordSchema):
     label = fields.Str(required=True)
     oca_schema = fields.Nested(OcaSchema())
     payload_dri = fields.Str(required=True)
+    usage_policy = fields.Str(required=False)

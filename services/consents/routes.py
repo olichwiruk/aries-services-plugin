@@ -4,7 +4,7 @@ from aiohttp_apispec import docs, request_schema
 from marshmallow import fields, Schema
 import json
 
-from aries_cloudagent.pdstorage_thcf.api import save_string, load_string
+from aries_cloudagent.pdstorage_thcf.api import *
 from ..models import OcaSchema
 from .models.defined_consent import DefinedConsentRecord
 from .models.given_consent import ConsentGivenRecord
@@ -41,10 +41,14 @@ async def add_consent(request: web.BaseRequest):
         payload_dri = await save_string(
             context, json.dumps(params["payload"]), json.dumps(metadata)
         )
+
+        pds = await pds_get_own_your_data(context)
+        pds_usage_policy = await pds.get_usage_policy()
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
             payload_dri=payload_dri,
+            usage_policy=pds_usage_policy,
         )
 
         await defined_consent.save(context)

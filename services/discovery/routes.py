@@ -44,7 +44,6 @@ class AddServiceSchema(Schema):
     label = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
-    appliance_policy = fields.Str(required=True)
 
 
 @request_schema(AddServiceSchema())
@@ -57,7 +56,6 @@ async def add_service(request: web.BaseRequest):
         label=params["label"],
         service_schema=params["service_schema"],
         consent_schema=params["consent_schema"],
-        appliance_policy=params["appliance_policy"],
     )
 
     try:
@@ -148,4 +146,4 @@ async def DEBUGrequest_services_list(request: web.BaseRequest):
                     raise web.HTTPRequestTimeout
             time.sleep(1)
 
-    raise web.HTTPNotFound
+    raise web.HTTPNotFound("Try again!")

@@ -55,7 +55,6 @@ class DiscoveryHandler(BaseHandler):
 
             record = record.dump(
                 {
-                    "appliance_policy": service.appliance_policy,
                     "service_schema": service.service_schema,
                     "consent_schema": consent_schema,
                     "service_id": service._id,
@@ -79,9 +78,9 @@ class DiscoveryResponseHandler(BaseHandler):
         pds_usage_policy = await pds.get_usage_policy()
         for i in services:
             i["policy_validation"] = await verify_usage_policy(
-                pds_usage_policy, i["appliance_policy"]
+                pds_usage_policy, i["consent_schema"]["usage_policy"]
             )
-            i.pop("appliance_policy", None)
+            i["consent_schema"].pop("usage_policy", None)
 
         print(json.dumps(services))
 
@@ -159,7 +158,6 @@ class DEBUGDiscoveryHandler(BaseHandler):
             record = DiscoveryServiceSchema()
             record = record.dump(
                 {
-                    "appliance_policy": service.appliance_policy,
                     "service_schema": service.service_schema,
                     "consent_schema": service.consent_schema,
                     "service_id": service._id,
@@ -187,16 +185,6 @@ class DEBUGDiscoveryResponseHandler(BaseHandler):
             record: DEBUGServiceDiscoveryRecord = DEBUGServiceDiscoveryRecord(
                 services=context.message.services,
                 connection_id=connection_id,
-            )
-
-        if context.message.services != []:
-            assert record.services != []
-
-        pds = await pds_get_own_your_data(context)
-        pds_usage_policy = await pds.get_usage_policy()
-        for i in record.services:
-            i["policy_validation"] = await verify_usage_policy(
-                pds_usage_policy, i["appliance_policy"]
             )
 
         await record.save(context)

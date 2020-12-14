@@ -5,6 +5,7 @@ from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicat
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
 from aries_cloudagent.holder.base import BaseHolder, HolderError
+from aries_cloudagent.wallet.base import BaseWallet
 
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema, match_info_schema
@@ -20,7 +21,6 @@ from .models import *
 from .message_types import *
 from ..models import *
 from ..consents.models.given_consent import ConsentGivenRecord
-from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.protocols.issue_credential.v1_1.messages.credential_request import (
@@ -41,6 +41,17 @@ class ApplySchema(Schema):
     connection_id = fields.Str(required=True)
     user_data = fields.Str(required=True)
     service = fields.Nested(DiscoveryServiceSchema())
+
+
+async def get_public_did(context):
+    wallet: BaseWallet = await context.inject(BaseWallet)
+    public_did = await wallet.get_public_did()
+    public_did = public_did[0]
+
+    if public_did == None:
+        raise web.HTTPBadRequest(reason="This operation requires a public DID!")
+
+    return public_did
 
 
 @docs(
@@ -83,6 +94,7 @@ async def apply(request: web.BaseRequest):
                 "oca_schema_dri": consent_schema["oca_schema_dri"],
                 "oca_schema_namespace": consent_schema["oca_schema_namespace"],
                 "data_dri": consent_schema["data_dri"],
+                "usage_policy": consent_schema["usage_policy"],
                 "service_consent_match_id": service_consent_match_id,
             }
         },
@@ -119,8 +131,7 @@ async def apply(request: web.BaseRequest):
           dri is used only to make sure DRI's are the same 
           when I store the data in other's agent PDS
     """
-    pds = await pds_get_own_your_data(context)
-    pds_usage_policy = await pds.get_usage_policy()
+    public_did = await get_public_did(context)
 
     request = Application(
         service_id=record.service_id,
@@ -129,7 +140,7 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
         consent_credential=credential,
-        usage_policy=pds_usage_policy,
+        public_did=public_did,
     )
     await outbound_handler(request, connection_id=connection_id)
 
@@ -222,7 +233,7 @@ async def process_application(request: web.BaseRequest):
                 "service_consent_match_id": issue.service_consent_match_id,
             }
         },
-        connection,
+        their_public_did=issue.their_public_did,
         exception=web.HTTPError,
     )
 

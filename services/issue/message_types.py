@@ -35,7 +35,7 @@ Application, ApplicationSchema = generate_model_schema(
         "service_user_data_dri": fields.Str(required=True),
         "service_consent_match_id": fields.Str(required=True),
         "consent_credential": fields.Str(required=True),
-        "usage_policy": fields.Str(required=True),
+        "public_did": fields.Str(required=True),
     },
 )
 

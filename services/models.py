@@ -24,6 +24,7 @@ class ConsentSchema(Schema):
     oca_schema_namespace = fields.Str(required=False)
     data_dri = fields.Str(required=False)
     data = fields.Str(required=False)
+    usage_policy = fields.Str(required=False)
 
 
 class ServiceSchema(Schema):
@@ -49,7 +50,6 @@ class ServiceRecord(BaseRecord):
         label: str = None,
         service_schema: ServiceSchema = None,
         consent_schema: ConsentSchema = None,
-        appliance_policy: str = None,
         state: str = None,
         record_id: str = None,
         **keyword_args,
@@ -57,7 +57,6 @@ class ServiceRecord(BaseRecord):
         super().__init__(record_id, state, **keyword_args)
         self.consent_schema = consent_schema
         self.service_schema = service_schema
-        self.appliance_policy = appliance_policy
         self.label = label
 
     @property
@@ -69,7 +68,6 @@ class ServiceRecord(BaseRecord):
                 "service_schema",
                 "consent_schema",
                 "label",
-                "appliance_policy",
             )
         }
 
@@ -86,4 +84,3 @@ class ServiceRecordSchema(BaseRecordSchema):
     service_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
     consent_schema = fields.Nested(ConsentSchema())
-    appliance_policy = fields.Str(required=True)
