@@ -31,7 +31,6 @@ import json
 
 from ..util import verify_usage_policy
 from aries_cloudagent.pdstorage_thcf.api import *
-from aries_cloudagent.pdstorage_thcf.api import pds_get_own_your_data
 from aries_cloudagent.aathcf.utils import debug_handler
 
 
@@ -74,11 +73,10 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         services = context.message.services
-        pds = await pds_get_own_your_data(context)
-        pds_usage_policy = await pds.get_usage_policy()
+        usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
         for i in services:
             i["policy_validation"] = await verify_usage_policy(
-                pds_usage_policy, i["consent_schema"]["usage_policy"]
+                usage_policy, i["consent_schema"]["usage_policy"]
             )
             i["consent_schema"].pop("usage_policy", None)
 

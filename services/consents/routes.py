@@ -8,6 +8,7 @@ from aries_cloudagent.pdstorage_thcf.api import *
 from ..models import OcaSchema
 from .models.defined_consent import DefinedConsentRecord
 from .models.given_consent import ConsentGivenRecord
+from ..models import ConsentSchema
 
 CONSENTS_TABLE = "consents"
 
@@ -42,8 +43,7 @@ async def add_consent(request: web.BaseRequest):
             context, json.dumps(params["payload"]), json.dumps(metadata)
         )
 
-        pds = await pds_get_own_your_data(context)
-        pds_usage_policy = await pds.get_usage_policy()
+        pds_usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
@@ -53,7 +53,14 @@ async def add_consent(request: web.BaseRequest):
 
         await defined_consent.save(context)
 
-        return web.json_response({"success": True})
+        schema = {
+            "oca_schema_dri": params["oca_schema"]["dri"],
+            "oca_schema_namespace": params["oca_schema"]["namespace"],
+            "data_dri": payload_dri,
+            "usage_policy": pds_usage_policy,
+        }
+
+        return web.json_response({"success": True, "schema": schema})
 
 
 @docs(tags=["Defined Consents"], summary="Get all consent definitions")
@@ -79,8 +86,7 @@ async def get_consents(request: web.BaseRequest):
 async def get_consents_given(request: web.BaseRequest):
     context = request.app["request_context"]
 
-    all_consents = await ConsentGivenRecord.query(context, {})
+    all_consents = await ConsentGivenRecord.query(context)
     serialized = [i.serialize() for i in all_consents]
-    # serialized["credential"] = json.loads(serialized["credential"])
 
     return web.json_response({"success": True, "result": serialized})
