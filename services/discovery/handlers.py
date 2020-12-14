@@ -80,7 +80,7 @@ class DiscoveryResponseHandler(BaseHandler):
             i["policy_validation"] = await verify_usage_policy(
                 pds_usage_policy, i["consent_schema"]["usage_policy"]
             )
-            i["consent_schema"].pop("usage_policy", None)
+            # i["consent_schema"].pop("usage_policy", None)
 
         print(json.dumps(services))
 
