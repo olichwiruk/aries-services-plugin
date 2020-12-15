@@ -74,18 +74,28 @@ class DiscoveryResponseHandler(BaseHandler):
 
         services = context.message.services
         usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
-        for i in services:
-            i["policy_validation"] = await verify_usage_policy(
-                usage_policy, i["consent_schema"]["usage_policy"]
-            )
-            i["consent_schema"].pop("usage_policy", None)
-
-        print(json.dumps(services))
 
         await responder.send_webhook(
             "verifiable-services/request-service-list",
-            {"services": json.dumps(services)},
+            {"services": services},
         )
+
+        # TODO: Delete this
+        result = {"service_id": "is_policy_matching"}
+        await responder.send_webhook(
+            "verifiable-services/request-service-list/usage-policy",
+            result,
+        )
+
+        for i in services:
+            result = {}
+            result[i["service_id"]] = await verify_usage_policy(
+                usage_policy, i["consent_schema"]["usage_policy"]
+            )
+            await responder.send_webhook(
+                "verifiable-services/request-service-list/usage-policy",
+                result,
+            )
 
 
 """

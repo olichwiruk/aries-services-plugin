@@ -19,7 +19,8 @@ from .models import ServiceRecord
 
 
 async def verify_usage_policy(controller_usage_policy, subject_usage_policy):
-    async with ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with ClientSession(timeout=timeout) as session:
         result = await session.post(
             "https://governance.ownyourdata.eu/api/usage-policy/match",
             json={
@@ -28,7 +29,6 @@ async def verify_usage_policy(controller_usage_policy, subject_usage_policy):
             },
         )
         result = await result.text()
-        print(result)
         return result
 
 
