@@ -13,13 +13,13 @@ from aries_cloudagent.messaging.base_handler import (
     BaseResponder,
     RequestContext,
 )
-from aiohttp import ClientSession, FormData
+from aiohttp import ClientSession, FormData, ClientTimeout
 from .issue.models import ServiceIssueRecord
 from .models import ServiceRecord
 
 
 async def verify_usage_policy(controller_usage_policy, subject_usage_policy):
-    timeout = aiohttp.ClientTimeout(total=15)
+    timeout = ClientTimeout(total=15)
     async with ClientSession(timeout=timeout) as session:
         result = await session.post(
             "https://governance.ownyourdata.eu/api/usage-policy/match",
