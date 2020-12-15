@@ -99,22 +99,16 @@ class ApplicationHandler(BaseHandler):
         )
 
         """
-        Verify usage policy and check if they provided a public did
+        Verify usage policy
         """
 
-        usage_policy_message = await verify_usage_policy(
-            service.consent_schema["usage_policy"],
-            consent["credentialSubject"]["usage_policy"],
-        )
-        if usage_policy_message.find("policies match") == -1:
-            LOGGER.error("Policies dont match! %s", usage_policy_message)
-            is_malformed = true
-
-        if context.message.public_did is None:
-            LOGGER.error(
-                "Applicant didn't provide a public did! %s", context.message.public_did
-            )
-            is_malformed = True
+        # usage_policy_message = await verify_usage_policy(
+        #     service.consent_schema["usage_policy"],
+        #     consent["credentialSubject"]["usage_policy"],
+        # )
+        # if usage_policy_message.find("policies match") == -1:
+        #     LOGGER.error("Policies dont match! %s", usage_policy_message)
+        #     is_malformed = true
 
         """
 

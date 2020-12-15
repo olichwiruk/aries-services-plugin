@@ -1,6 +1,6 @@
 from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.messaging.valid import UUIDFour
-from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
+from aries_cloudagent.storage.error import *
 
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
@@ -30,8 +30,7 @@ from aries_cloudagent.protocols.issue_credential.v1_1.utils import (
     create_credential,
     retrieve_connection,
 )
-
-from ..util import retrieve_service, retrieve_service_issue
+from ..util import *
 
 LOGGER = logging.getLogger(__name__)
 MY_SERVICE_DATA_TABLE = "my_service_data_table"
@@ -281,9 +280,10 @@ async def get_issue_self(request: web.BaseRequest):
 
     try:
         query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    except StorageError as err:
+        raise web.HTTPInternalServerError(err)
 
+    usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     result = []
     for i in query:
         record: dict = i.serialize()
@@ -294,6 +294,12 @@ async def get_issue_self(request: web.BaseRequest):
         """
 
         service_user_data = await load_string(context, i.service_user_data_dri)
+
+        if usage_policy is not None and i.author == ServiceIssueRecord.AUTHOR_SELF:
+            policy_valid = await verify_usage_policy(
+                usage_policy, i.consent_schema["usage_policy"]
+            )
+            record["usage_policies_match"] = policy_valid
 
         record.update(
             {
@@ -324,8 +330,8 @@ async def get_issue_by_id(request: web.BaseRequest):
 
     try:
         query = await ServiceIssueRecord.retrieve_by_id(context, issue_id)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    except StorageError as err:
+        raise web.HTTPInternalServerError(err)
 
     record: dict = query.serialize()
 
@@ -353,10 +359,7 @@ async def DEBUGapply_status(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
-    try:
-        query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    query = await ServiceIssueRecord.query(context, tag_filter=params)
 
     query = [i.serialize() for i in query]
 
@@ -367,11 +370,8 @@ async def DEBUGget_credential_data(request: web.BaseRequest):
     context = request.app["request_context"]
     data_dri = request.match_info["data_dri"]
 
-    try:
-        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
-            context, data_dri
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+        context, data_dri
+    )
 
     return web.json_response({"credential_data": query.payload})
