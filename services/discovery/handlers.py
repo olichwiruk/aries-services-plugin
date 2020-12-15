@@ -83,13 +83,6 @@ class DiscoveryResponseHandler(BaseHandler):
             },
         )
 
-        # TODO: Delete this
-        result = {"service_id": "is_policy_matching"}
-        await responder.send_webhook(
-            "verifiable-services/request-service-list/usage-policy",
-            result,
-        )
-
         for i in services:
             result = {}
             result[i["service_id"]] = await verify_usage_policy(
