@@ -87,17 +87,12 @@ async def apply(request: web.BaseRequest):
     """
 
     service_consent_match_id = str(uuid.uuid4())
+
+    credential_values = {"service_consent_match_id": service_consent_match_id}
+    credential_values.update(consent_schema)
     credential = await create_credential(
         context,
-        {
-            "credential_values": {
-                "oca_schema_dri": consent_schema["oca_schema_dri"],
-                "oca_schema_namespace": consent_schema["oca_schema_namespace"],
-                "data_dri": consent_schema["data_dri"],
-                "usage_policy": consent_schema["usage_policy"],
-                "service_consent_match_id": service_consent_match_id,
-            }
-        },
+        {"credential_values": credential_values},
         exception=web.HTTPError,
     )
 

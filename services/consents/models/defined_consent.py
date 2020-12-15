@@ -38,7 +38,7 @@ class DefinedConsentRecord(BaseRecord):
 
     @property
     def record_tags(self) -> dict:
-        return {"label": self.label}
+        return {"label": self.label, "payload_dri": self.payload_dri}
 
 
 class DefinedConsentRecordSchema(BaseRecordSchema):

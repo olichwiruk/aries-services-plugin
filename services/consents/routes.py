@@ -5,6 +5,7 @@ from marshmallow import fields, Schema
 import json
 
 from aries_cloudagent.pdstorage_thcf.api import *
+from aries_cloudagent.storage.error import StorageError
 from ..models import OcaSchema
 from .models.defined_consent import DefinedConsentRecord
 from .models.given_consent import ConsentGivenRecord
@@ -26,9 +27,13 @@ async def add_consent(request: web.BaseRequest):
     params = await request.json()
     errors = []
 
-    existing_consents = await DefinedConsentRecord.query(
-        context, {"label": params["label"]}
-    )
+    try:
+        existing_consents = await DefinedConsentRecord.query(
+            context, {"label": params["label"]}
+        )
+    except StorageError as err:
+        raise web.HTTPInternalServerError(reason=err)
+
     if existing_consents:
         errors.append(f"Consent with '{params['label']}' label is already defined")
 
@@ -39,11 +44,22 @@ async def add_consent(request: web.BaseRequest):
             "oca_schema_dri": params["oca_schema"]["dri"],
             "table": CONSENTS_TABLE,
         }
+
+        """
+        If pds supports usage policy then pack it into consent
+        """
+
+        schema = {}
+        consent_user_data = params["payload"]
+        pds_usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
+        if pds_usage_policy is not None:
+            consent_user_data["usage_policy"] = pds_usage_policy
+            schema["usage_policy"] = pds_usage_policy
+
         payload_dri = await save_string(
-            context, json.dumps(params["payload"]), json.dumps(metadata)
+            context, json.dumps(consent_user_data), json.dumps(metadata)
         )
 
-        pds_usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
         defined_consent = DefinedConsentRecord(
             label=params["label"],
             oca_schema=params["oca_schema"],
@@ -51,14 +67,11 @@ async def add_consent(request: web.BaseRequest):
             usage_policy=pds_usage_policy,
         )
 
-        await defined_consent.save(context)
+        consent_id = await defined_consent.save(context)
 
-        schema = {
-            "oca_schema_dri": params["oca_schema"]["dri"],
-            "oca_schema_namespace": params["oca_schema"]["namespace"],
-            "data_dri": payload_dri,
-            "usage_policy": pds_usage_policy,
-        }
+        schema["oca_schema_dri"] = params["oca_schema"]["dri"]
+        schema["oca_schema_namespace"] = params["oca_schema"]["namespace"]
+        schema["data_dri"] = payload_dri
 
         return web.json_response({"success": True, "schema": schema})
 
@@ -67,10 +80,15 @@ async def add_consent(request: web.BaseRequest):
 async def get_consents(request: web.BaseRequest):
     context = request.app["request_context"]
 
-    all_consents = await DefinedConsentRecord.query(context, {})
+    try:
+        all_consents = await DefinedConsentRecord.query(context, {})
+    except StorageError as err:
+        raise web.HTTPInternalServerError(reason=err)
+
     result = list(map(lambda el: el.record_value, all_consents))
     for consent in result:
         payload = await load_string(context, consent["payload_dri"])
+        print("PAYLOAD: ", payload)
         if payload:
             consent["payload"] = json.loads(payload)
         else:
@@ -86,7 +104,10 @@ async def get_consents(request: web.BaseRequest):
 async def get_consents_given(request: web.BaseRequest):
     context = request.app["request_context"]
 
-    all_consents = await ConsentGivenRecord.query(context)
+    try:
+        all_consents = await ConsentGivenRecord.query(context)
+    except StorageError as err:
+        raise web.HTTPInternalServerError(reason=err)
     serialized = [i.serialize() for i in all_consents]
 
     return web.json_response({"success": True, "result": serialized})
