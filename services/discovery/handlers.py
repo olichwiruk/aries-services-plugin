@@ -77,7 +77,10 @@ class DiscoveryResponseHandler(BaseHandler):
 
         await responder.send_webhook(
             "verifiable-services/request-service-list",
-            {"services": services},
+            {
+                "connection_id": connection_id,
+                "services": services
+            },
         )
 
         # TODO: Delete this
