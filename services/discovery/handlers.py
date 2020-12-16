@@ -49,17 +49,14 @@ class DiscoveryHandler(BaseHandler):
             consent_schema_data = await load_string(
                 context, consent_schema.get("data_dri")
             )
-            print("consent_schema_data: ", consent_schema_data)
-            # consent_schema["data"] = consent_schema_data
+            consent_schema["data"] = consent_schema_data
 
             record = {
                 "service_schema": service.service_schema,
                 "consent_schema": consent_schema,
-                "consent_schema_data": consent_schema_data,
                 "service_id": service._id,
                 "label": service.label,
             }
-
             records.append(record)
 
         response = DiscoveryResponse(services=records)
@@ -76,7 +73,7 @@ class DiscoveryResponseHandler(BaseHandler):
 
         await responder.send_webhook(
             "verifiable-services/request-service-list",
-            {"services": services},
+            {"connection_id": connection_id, "services": services},
         )
 
         usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)

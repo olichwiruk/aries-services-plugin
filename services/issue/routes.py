@@ -295,13 +295,12 @@ async def get_issue_self(request: web.BaseRequest):
 
         service_user_data = await load_string(context, i.service_user_data_dri)
 
-        if usage_policy is not None and i.author == ServiceIssueRecord.AUTHOR_SELF:
-            policy_valid = await verify_usage_policy(
-                usage_policy, i.consent_schema["usage_policy"]
-            )
-            record["usage_policies_match"] = policy_valid
-        # elif usage_policy is not None and i.author == ServiceIssueRecord.AUTHOR_OTHER:
-
+        if usage_policy is not None:
+            if i.author == ServiceIssueRecord.AUTHOR_OTHER:
+                record["usage_policies_match"] = await verify_usage_policy(
+                    i.consent_schema["usage_policy"],
+                    i.consent_credential["credentialSubject"]["usage_policy"],
+                )
 
         record.update(
             {
@@ -331,7 +330,9 @@ async def get_issue_by_id(request: web.BaseRequest):
     issue_id = request.match_info["issue_id"]
 
     try:
-        query = await ServiceIssueRecord.retrieve_by_id(context, issue_id)
+        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+            context, issue_id
+        )
     except StorageError as err:
         raise web.HTTPInternalServerError(err)
 
@@ -343,6 +344,12 @@ async def get_issue_by_id(request: web.BaseRequest):
     """
 
     service_user_data = await load_string(context, query.service_user_data_dri)
+
+    if usage_policy is not None:
+        if query.author == ServiceIssueRecord.AUTHOR_OTHER:
+            record["usage_policies_match"] = await verify_usage_policy(
+                query.consent_schema["usage_policy"], query.credential["usage_policy"]
+            )
 
     record.update(
         {
