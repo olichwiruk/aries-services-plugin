@@ -72,23 +72,29 @@ async def apply(request: web.BaseRequest):
     connection_id = params["connection_id"]
     service_user_data = params["user_data"]
     service_id = params["service"]["service_id"]
-    consent_schema = params["service"]["consent_schema"]
+
+    # service consent and service to check for correctness
+    service_consent_schema = params["service"]["consent_schema"]
     service_schema = params["service"]["service_schema"]
-    label = params["service"]["label"]
+    service_label = params["service"]["label"]
 
     connection = await retrieve_connection(context, connection_id)
     issuer: BaseIssuer = await context.inject(BaseIssuer)
 
-    """
-
-    Issue consent credential for service provider
-
-    """
-
     service_consent_match_id = str(uuid.uuid4())
 
+    """
+    Pop the usage policy of service provider and bring our policy to
+    credential
+    """
+
+    service_consent_schema.pop("usage_policy", None)
+    usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     credential_values = {"service_consent_match_id": service_consent_match_id}
-    credential_values.update(consent_schema)
+    credential_values["usage_policy"] = usage_policy
+
+    credential_values.update(service_consent_schema)
+
     credential = await create_credential(
         context,
         {"credential_values": credential_values},
@@ -107,8 +113,8 @@ async def apply(request: web.BaseRequest):
         connection_id=connection_id,
         state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
         author=ServiceIssueRecord.AUTHOR_SELF,
-        label=label,
-        consent_schema=consent_schema,
+        label=service_label,
+        consent_schema=service_consent_schema,
         service_id=service_id,
         service_schema=service_schema,
         service_user_data_dri=service_user_data_dri,
@@ -118,12 +124,13 @@ async def apply(request: web.BaseRequest):
     await record.save(context)
 
     """ 
-    NOTE: service_user_data_dri - is here so that in the future it would be easier
-          to not send the service_user_data, because from what I understand we only
-          want to send that to the other party under certain conditions
+    service_user_data_dri - is here so that in the future it would be easier
+    to not send the service_user_data, because from what I understand we only
+    want to send that to the other party under certain conditions
 
-          dri is used only to make sure DRI's are the same 
-          when I store the data in other's agent PDS
+    dri is used only to make sure DRI's are the same 
+    when I store the data in other's agent PDS
+
     """
     public_did = await get_public_did(context)
 
@@ -145,7 +152,7 @@ async def apply(request: web.BaseRequest):
     """
 
     consent_given_record = ConsentGivenRecord(
-        consent_user_data_dri=consent_schema["data_dri"],
+        consent_user_data_dri=service_consent_schema["data_dri"],
         connection_id=connection_id,
         credential=credential,
         service_consent_match_id=service_consent_match_id,
