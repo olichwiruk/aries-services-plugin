@@ -300,6 +300,8 @@ async def get_issue_self(request: web.BaseRequest):
                 usage_policy, i.consent_schema["usage_policy"]
             )
             record["usage_policies_match"] = policy_valid
+        # elif usage_policy is not None and i.author == ServiceIssueRecord.AUTHOR_OTHER:
+
 
         record.update(
             {

@@ -49,17 +49,17 @@ class DiscoveryHandler(BaseHandler):
             consent_schema_data = await load_string(
                 context, consent_schema.get("data_dri")
             )
-            if consent_schema_data != None:
-                consent_schema["data"] = consent_schema_data
+            print("consent_schema_data: ", consent_schema_data)
+            # consent_schema["data"] = consent_schema_data
 
-            record = record.dump(
-                {
-                    "service_schema": service.service_schema,
-                    "consent_schema": consent_schema,
-                    "service_id": service._id,
-                    "label": service.label,
-                }
-            )
+            record = {
+                "service_schema": service.service_schema,
+                "consent_schema": consent_schema,
+                "consent_schema_data": consent_schema_data,
+                "service_id": service._id,
+                "label": service.label,
+            }
+
             records.append(record)
 
         response = DiscoveryResponse(services=records)
@@ -73,20 +73,13 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         services = context.message.services
-        usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
 
         await responder.send_webhook(
             "verifiable-services/request-service-list",
             {"services": services},
         )
 
-        # TODO: Delete this
-        result = {"service_id": "is_policy_matching"}
-        await responder.send_webhook(
-            "verifiable-services/request-service-list/usage-policy",
-            result,
-        )
-
+        usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
         for i in services:
             result = {}
             result[i["service_id"]] = await verify_usage_policy(
