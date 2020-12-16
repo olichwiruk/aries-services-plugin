@@ -114,7 +114,7 @@ async def apply(request: web.BaseRequest):
         state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
         author=ServiceIssueRecord.AUTHOR_SELF,
         label=service_label,
-        consent_schema=service_consent_schema,
+        service_consent_schema=service_consent_schema,
         service_id=service_id,
         service_schema=service_schema,
         service_user_data_dri=service_user_data_dri,
@@ -305,8 +305,8 @@ async def get_issue_self(request: web.BaseRequest):
         if usage_policy is not None:
             if i.author == ServiceIssueRecord.AUTHOR_OTHER:
                 record["usage_policies_match"] = await verify_usage_policy(
-                    i.consent_schema["usage_policy"],
-                    i.consent_credential["credentialSubject"]["usage_policy"],
+                    i.service_consent_schema["usage_policy"],
+                    i.user_consent_credential["credentialSubject"]["usage_policy"],
                 )
 
         record.update(
@@ -315,7 +315,7 @@ async def get_issue_self(request: web.BaseRequest):
                 "label": i.label,
                 "service_user_data": service_user_data,
                 "service_schema": json.dumps(i.service_schema),
-                "consent_schema": json.dumps(i.consent_schema),
+                "consent_schema": json.dumps(i.service_consent_schema),
             }
         )
         result.append(record)
@@ -364,7 +364,7 @@ async def get_issue_by_id(request: web.BaseRequest):
             "label": query.label,
             "service_user_data": service_user_data,
             "service_schema": json.dumps(query.service_schema),
-            "consent_schema": json.dumps(query.consent_schema),
+            "consent_schema": json.dumps(query.service_consent_schema),
         }
     )
 

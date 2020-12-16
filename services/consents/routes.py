@@ -51,10 +51,6 @@ async def add_consent(request: web.BaseRequest):
 
         schema = {}
         consent_user_data = params["payload"]
-        pds_usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
-        if pds_usage_policy is not None:
-            consent_user_data["usage_policy"] = pds_usage_policy
-            schema["usage_policy"] = pds_usage_policy
 
         payload_dri = await save_string(
             context, json.dumps(consent_user_data), json.dumps(metadata)

@@ -161,8 +161,8 @@ class ApplicationHandler(BaseHandler):
             service_consent_match_id=context.message.service_consent_match_id,
             service_user_data_dri=user_data_dri,
             service_schema=service.service_schema,
-            consent_schema=service.consent_schema,
-            consent_credential=consent,
+            service_consent_schema=service.consent_schema,
+            user_consent_credential=consent,
             label=service.label,
             their_public_did=context.message.public_did,
         )
