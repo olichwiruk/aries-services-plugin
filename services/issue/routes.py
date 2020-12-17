@@ -87,13 +87,13 @@ async def apply(request: web.BaseRequest):
     Pop the usage policy of service provider and bring our policy to
     credential
     """
-
-    service_consent_schema.pop("usage_policy", None)
+    service_consent_copy = service_consent_schema.copy()
+    service_consent_copy.pop("data", None)
     usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     credential_values = {"service_consent_match_id": service_consent_match_id}
     credential_values["usage_policy"] = usage_policy
 
-    credential_values.update(service_consent_schema)
+    credential_values.update(service_consent_copy)
 
     credential = await create_credential(
         context,
@@ -109,6 +109,7 @@ async def apply(request: web.BaseRequest):
         context, service_user_data, json.dumps(metadata)
     )
 
+    print("service_consent_schema: ", service_consent_schema)
     record = ServiceIssueRecord(
         connection_id=connection_id,
         state=ServiceIssueRecord.ISSUE_WAITING_FOR_RESPONSE,
@@ -260,6 +261,39 @@ class GetIssueFilteredSchema(Schema):
     state = fields.Str(required=False)
 
 
+async def serialize_and_verify_service_issue(context, issue):
+    record: dict = issue.serialize()
+
+    """
+    Serialize additional fields which are not serializable
+    by default (information that is in PDS)
+    """
+
+    service_user_data = await load_string(context, issue.service_user_data_dri)
+    service: ServiceRecord = await retrieve_service(context, issue.service_id)
+    consent_data = await load_string(context, service.consent_schema.get("data_dri"))
+    consent_data = json.loads(consent_data)
+
+    if consent_data.get("usage_policy") is not None:
+        if issue.author == ServiceIssueRecord.AUTHOR_OTHER:
+            record["usage_policies_match"] = await verify_usage_policy(
+                consent_data["usage_policy"],
+                issue.user_consent_credential["credentialSubject"]["usage_policy"],
+            )
+
+    record.update(
+        {
+            "issue_id": issue._id,
+            "label": issue.label,
+            "service_user_data": service_user_data,
+            "service_schema": json.dumps(issue.service_schema),
+            "consent_schema": json.dumps(consent_data),
+        }
+    )
+
+    return record
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Search for issue by a specified tag",
@@ -290,34 +324,9 @@ async def get_issue_self(request: web.BaseRequest):
     except StorageError as err:
         raise web.HTTPInternalServerError(err)
 
-    usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     result = []
     for i in query:
-        record: dict = i.serialize()
-
-        """
-        Serialize additional fields which are not serializable
-        by default (information that is in PDS)
-        """
-
-        service_user_data = await load_string(context, i.service_user_data_dri)
-
-        if usage_policy is not None:
-            if i.author == ServiceIssueRecord.AUTHOR_OTHER:
-                record["usage_policies_match"] = await verify_usage_policy(
-                    i.service_consent_schema["usage_policy"],
-                    i.user_consent_credential["credentialSubject"]["usage_policy"],
-                )
-
-        record.update(
-            {
-                "issue_id": i._id,
-                "label": i.label,
-                "service_user_data": service_user_data,
-                "service_schema": json.dumps(i.service_schema),
-                "consent_schema": json.dumps(i.service_consent_schema),
-            }
-        )
+        record = await serialize_and_verify_service_issue(context, i)
         result.append(record)
 
     return web.json_response(result)
@@ -343,30 +352,7 @@ async def get_issue_by_id(request: web.BaseRequest):
     except StorageError as err:
         raise web.HTTPInternalServerError(err)
 
-    record: dict = query.serialize()
-
-    """
-    Serialize additional fields which are not serializable
-    by default (information that is in PDS)
-    """
-
-    service_user_data = await load_string(context, query.service_user_data_dri)
-
-    if usage_policy is not None:
-        if query.author == ServiceIssueRecord.AUTHOR_OTHER:
-            record["usage_policies_match"] = await verify_usage_policy(
-                query.consent_schema["usage_policy"], query.credential["usage_policy"]
-            )
-
-    record.update(
-        {
-            "issue_id": query._id,
-            "label": query.label,
-            "service_user_data": service_user_data,
-            "service_schema": json.dumps(query.service_schema),
-            "consent_schema": json.dumps(query.service_consent_schema),
-        }
-    )
+    record = await serialize_and_verify_service_issue(context, query)
 
     return web.json_response(record)
 

@@ -34,31 +34,33 @@ from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.aathcf.utils import debug_handler
 
 
+async def get_serialized_services(context):
+    query = await ServiceRecord().query(context)
+
+    records = []
+    for service in query:
+        record = DiscoveryServiceSchema()
+
+        consent_schema = service.consent_schema
+        consent_schema_data = await load_string(context, consent_schema.get("data_dri"))
+        consent_schema["data"] = json.loads(consent_schema_data)
+
+        record = {
+            "service_schema": service.service_schema,
+            "consent_schema": consent_schema,
+            "service_id": service._id,
+            "label": service.label,
+        }
+        records.append(record)
+
+    return records
+
+
 class DiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, Discovery)
-        storage: BaseStorage = await context.inject(BaseStorage)
 
-        query = await ServiceRecord().query(context)
-
-        records = []
-        for service in query:
-            record = DiscoveryServiceSchema()
-
-            consent_schema = service.consent_schema
-            consent_schema_data = await load_string(
-                context, consent_schema.get("data_dri")
-            )
-            consent_schema["data"] = consent_schema_data
-
-            record = {
-                "service_schema": service.service_schema,
-                "consent_schema": consent_schema,
-                "service_id": service._id,
-                "label": service.label,
-            }
-            records.append(record)
-
+        records = await get_serialized_services(context)
         response = DiscoveryResponse(services=records)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)
@@ -80,7 +82,7 @@ class DiscoveryResponseHandler(BaseHandler):
         for i in services:
             result = {}
             result[i["service_id"]] = await verify_usage_policy(
-                usage_policy, i["consent_schema"]["usage_policy"]
+                usage_policy, i["consent_schema"]["data"]["usage_policy"]
             )
             await responder.send_webhook(
                 "verifiable-services/request-service-list/usage-policy",
@@ -148,22 +150,7 @@ class DEBUGDiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, DEBUGDiscovery)
 
-        storage: BaseStorage = await context.inject(BaseStorage)
-        query = await ServiceRecord().query(context)
-
-        records = []
-        for service in query:
-            record = DiscoveryServiceSchema()
-            record = record.dump(
-                {
-                    "service_schema": service.service_schema,
-                    "consent_schema": service.consent_schema,
-                    "service_id": service._id,
-                    "label": service.label,
-                }
-            )
-            records.append(record)
-
+        records = await get_serialized_services(context)
         response = DEBUGDiscoveryResponse(services=records)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)

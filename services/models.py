@@ -23,7 +23,7 @@ class ConsentSchema(Schema):
     oca_schema_dri = fields.Str(required=False)
     oca_schema_namespace = fields.Str(required=False)
     data_dri = fields.Str(required=False)
-    usage_policy = fields.Str(required=False)
+    data = fields.Dict()
 
 
 class ServiceSchema(Schema):
