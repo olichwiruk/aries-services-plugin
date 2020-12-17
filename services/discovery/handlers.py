@@ -29,6 +29,7 @@ import hashlib
 import uuid
 import json
 
+from ..util import verify_usage_policy
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.aathcf.utils import debug_handler
 
@@ -48,18 +49,14 @@ class DiscoveryHandler(BaseHandler):
             consent_schema_data = await load_string(
                 context, consent_schema.get("data_dri")
             )
-            if consent_schema_data != None:
-                consent_schema["data"] = consent_schema_data
-            print('consent_schema.get("data")', consent_schema.get("data"))
+            consent_schema["data"] = consent_schema_data
 
-            record = record.dump(
-                {
-                    "service_schema": service.service_schema,
-                    "consent_schema": consent_schema,
-                    "service_id": service._id,
-                    "label": service.label,
-                }
-            )
+            record = {
+                "service_schema": service.service_schema,
+                "consent_schema": consent_schema,
+                "service_id": service._id,
+                "label": service.label,
+            }
             records.append(record)
 
         response = DiscoveryResponse(services=records)
@@ -72,10 +69,23 @@ class DiscoveryResponseHandler(BaseHandler):
         debug_handler(self._logger.debug, context, DiscoveryResponse)
         connection_id = context.connection_record.connection_id
 
+        services = context.message.services
+        usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
+
         await responder.send_webhook(
             "verifiable-services/request-service-list",
-            {"services": json.dumps(context.message.services)},
+            {"connection_id": connection_id, "services": services},
         )
+
+        for i in services:
+            result = {}
+            result[i["service_id"]] = await verify_usage_policy(
+                usage_policy, i["consent_schema"]["usage_policy"]
+            )
+            await responder.send_webhook(
+                "verifiable-services/request-service-list/usage-policy",
+                result,
+            )
 
 
 """
@@ -130,7 +140,7 @@ class DEBUGServiceDiscoveryRecordSchema(BaseRecordSchema):
     class Meta:
         model_class = "DEBUGServiceDiscoveryRecord"
 
-    services = fields.List(fields.Nested(ServiceRecordSchema()))
+    services = fields.List(fields.Dict())
     connection_id = fields.Str()
 
 
@@ -162,7 +172,6 @@ class DEBUGDiscoveryHandler(BaseHandler):
 class DEBUGDiscoveryResponseHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, DEBUGDiscoveryResponse)
-
         connection_id = context.connection_record.connection_id
 
         try:
@@ -176,6 +185,4 @@ class DEBUGDiscoveryResponseHandler(BaseHandler):
                 connection_id=connection_id,
             )
 
-        if context.message.services != []:
-            assert record.services != []
         await record.save(context)

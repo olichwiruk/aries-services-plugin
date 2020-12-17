@@ -1,14 +1,11 @@
 from aries_cloudagent.connections.models.connection_record import ConnectionRecord
 from aries_cloudagent.messaging.valid import UUIDFour
-from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
+from aries_cloudagent.storage.error import *
 
-from aries_cloudagent.ledger.error import LedgerError
-from aries_cloudagent.indy.error import IndyError
-from aries_cloudagent.ledger.error import BadLedgerRequestError
-from aries_cloudagent.ledger.base import BaseLedger
 from aries_cloudagent.storage.base import BaseStorage
 from aries_cloudagent.issuer.base import BaseIssuer, IssuerError
 from aries_cloudagent.holder.base import BaseHolder, HolderError
+from aries_cloudagent.wallet.base import BaseWallet
 
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema, match_info_schema
@@ -24,7 +21,6 @@ from .models import *
 from .message_types import *
 from ..models import *
 from ..consents.models.given_consent import ConsentGivenRecord
-from .credentials import *
 from ..discovery.message_types import DiscoveryServiceSchema
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.protocols.issue_credential.v1_1.messages.credential_request import (
@@ -34,10 +30,10 @@ from aries_cloudagent.protocols.issue_credential.v1_1.utils import (
     create_credential,
     retrieve_connection,
 )
-
-from ..util import retrieve_service, retrieve_service_issue
+from ..util import *
 
 LOGGER = logging.getLogger(__name__)
+MY_SERVICE_DATA_TABLE = "my_service_data_table"
 
 
 class ApplySchema(Schema):
@@ -46,37 +42,15 @@ class ApplySchema(Schema):
     service = fields.Nested(DiscoveryServiceSchema())
 
 
-class ApplyStatusSchema(Schema):
-    service_id = fields.Str(required=False)
-    connection_id = fields.Str(required=False)
-    exchange_id = fields.Str(required=False)
+async def get_public_did(context):
+    wallet: BaseWallet = await context.inject(BaseWallet)
+    public_did = await wallet.get_public_did()
+    public_did = public_did[0]
 
+    if public_did == None:
+        raise web.HTTPBadRequest(reason="This operation requires a public DID!")
 
-class GetCredentialDataSchema(Schema):
-    data_dri = fields.Str(required=False)
-
-
-class GetIssueSchema(Schema):
-    exchange_id = fields.Str(required=False)
-    connection_id = fields.Str(required=False)
-
-
-class GetIssueFilteredSchema(Schema):
-    connection_id = fields.Str(required=False)
-    exchange_id = fields.Str(required=False)
-    service_id = fields.Str(required=False)
-    label = fields.Str(required=False)
-    author = fields.Str(required=False)
-    state = fields.Str(required=False)
-
-
-class GetIssueByIdSchema(Schema):
-    issue_id = fields.Str(required=True)
-
-
-class ProcessApplicationSchema(Schema):
-    issue_id = fields.Str(required=True)
-    decision = fields.Str(required=True)
+    return public_did
 
 
 @docs(
@@ -112,22 +86,22 @@ async def apply(request: web.BaseRequest):
     """
 
     service_consent_match_id = str(uuid.uuid4())
+
+    credential_values = {"service_consent_match_id": service_consent_match_id}
+    credential_values.update(consent_schema)
     credential = await create_credential(
         context,
-        {
-            "credential_values": {
-                "oca_schema_dri": consent_schema["oca_schema_dri"],
-                "oca_schema_namespace": consent_schema["oca_schema_namespace"],
-                "data_dri": consent_schema["data_dri"],
-                "service_consent_match_id": service_consent_match_id,
-            }
-        },
-        connection,
+        {"credential_values": credential_values},
         exception=web.HTTPError,
     )
 
-    metadata = { "oca_schema_dri": service_schema["oca_schema_dri"]}
-    service_user_data_dri = await save_string(context, service_user_data, json.dumps(metadata))
+    metadata = {
+        "oca_schema_dri": service_schema["oca_schema_dri"],
+        "table": MY_SERVICE_DATA_TABLE,
+    }
+    service_user_data_dri = await save_string(
+        context, service_user_data, json.dumps(metadata)
+    )
 
     record = ServiceIssueRecord(
         connection_id=connection_id,
@@ -140,9 +114,8 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
     )
-    
-    await record.save(context)
 
+    await record.save(context)
 
     """ 
     NOTE: service_user_data_dri - is here so that in the future it would be easier
@@ -152,6 +125,7 @@ async def apply(request: web.BaseRequest):
           dri is used only to make sure DRI's are the same 
           when I store the data in other's agent PDS
     """
+    public_did = await get_public_did(context)
 
     request = Application(
         service_id=record.service_id,
@@ -160,6 +134,7 @@ async def apply(request: web.BaseRequest):
         service_user_data_dri=service_user_data_dri,
         service_consent_match_id=service_consent_match_id,
         consent_credential=credential,
+        public_did=public_did,
     )
     await outbound_handler(request, connection_id=connection_id)
 
@@ -178,12 +153,19 @@ async def apply(request: web.BaseRequest):
 
     await consent_given_record.save(context)
 
-    return web.json_response(request.serialize())
+    return web.json_response(
+        {"success": "application_sent", "exchange_id": record.exchange_id}
+    )
 
 
 async def send_confirmation(outbound_handler, connection_id, exchange_id, state):
     confirmation = Confirmation(exchange_id=exchange_id, state=state)
     await outbound_handler(confirmation, connection_id=connection_id)
+
+
+class ProcessApplicationSchema(Schema):
+    issue_id = fields.Str(required=True)
+    decision = fields.Str(required=True)
 
 
 @docs(
@@ -245,7 +227,7 @@ async def process_application(request: web.BaseRequest):
                 "service_consent_match_id": issue.service_consent_match_id,
             }
         },
-        connection,
+        their_public_did=issue.their_public_did,
         exception=web.HTTPError,
     )
 
@@ -262,6 +244,15 @@ async def process_application(request: web.BaseRequest):
     )
 
 
+class GetIssueFilteredSchema(Schema):
+    connection_id = fields.Str(required=False)
+    exchange_id = fields.Str(required=False)
+    service_id = fields.Str(required=False)
+    label = fields.Str(required=False)
+    author = fields.Str(required=False)
+    state = fields.Str(required=False)
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Search for issue by a specified tag",
@@ -272,9 +263,6 @@ async def process_application(request: web.BaseRequest):
     STATES: 
     "pending" - not processed yet (not rejected or accepted)
     "no response" - agent didn't respond at all yet
-    "service not found"
-    "ledger error"
-    "cred prep complete"
     "rejected"
     "accepted"
 
@@ -292,9 +280,10 @@ async def get_issue_self(request: web.BaseRequest):
 
     try:
         query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    except StorageError as err:
+        raise web.HTTPInternalServerError(err)
 
+    usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     result = []
     for i in query:
         record: dict = i.serialize()
@@ -305,6 +294,14 @@ async def get_issue_self(request: web.BaseRequest):
         """
 
         service_user_data = await load_string(context, i.service_user_data_dri)
+
+        if usage_policy is not None:
+            if i.author == ServiceIssueRecord.AUTHOR_OTHER:
+                print(i.consent_credential)
+                record["usage_policies_match"] = await verify_usage_policy(
+                    i.consent_schema["usage_policy"],
+                    i.consent_credential["credentialSubject"]["usage_policy"],
+                )
 
         record.update(
             {
@@ -320,6 +317,10 @@ async def get_issue_self(request: web.BaseRequest):
     return web.json_response(result)
 
 
+class GetIssueByIdSchema(Schema):
+    issue_id = fields.Str(required=True)
+
+
 @docs(
     tags=["Verifiable Services"],
     summary="Search for issue by id",
@@ -330,9 +331,11 @@ async def get_issue_by_id(request: web.BaseRequest):
     issue_id = request.match_info["issue_id"]
 
     try:
-        query = await ServiceIssueRecord.retrieve_by_id(context, issue_id)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+            context, issue_id
+        )
+    except StorageError as err:
+        raise web.HTTPInternalServerError(err)
 
     record: dict = query.serialize()
 
@@ -342,6 +345,12 @@ async def get_issue_by_id(request: web.BaseRequest):
     """
 
     service_user_data = await load_string(context, query.service_user_data_dri)
+
+    if usage_policy is not None:
+        if query.author == ServiceIssueRecord.AUTHOR_OTHER:
+            record["usage_policies_match"] = await verify_usage_policy(
+                query.consent_schema["usage_policy"], query.credential["usage_policy"]
+            )
 
     record.update(
         {
@@ -360,10 +369,7 @@ async def DEBUGapply_status(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
 
-    try:
-        query = await ServiceIssueRecord.query(context, tag_filter=params)
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    query = await ServiceIssueRecord.query(context, tag_filter=params)
 
     query = [i.serialize() for i in query]
 
@@ -374,11 +380,8 @@ async def DEBUGget_credential_data(request: web.BaseRequest):
     context = request.app["request_context"]
     data_dri = request.match_info["data_dri"]
 
-    try:
-        query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
-            context, data_dri
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    query: ServiceIssueRecord = await ServiceIssueRecord.retrieve_by_id(
+        context, data_dri
+    )
 
     return web.json_response({"credential_data": query.payload})

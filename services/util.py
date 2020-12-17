@@ -13,9 +13,23 @@ from aries_cloudagent.messaging.base_handler import (
     BaseResponder,
     RequestContext,
 )
-
+from aiohttp import ClientSession, FormData, ClientTimeout
 from .issue.models import ServiceIssueRecord
 from .models import ServiceRecord
+
+
+async def verify_usage_policy(controller_usage_policy, subject_usage_policy):
+    timeout = ClientTimeout(total=15)
+    async with ClientSession(timeout=timeout) as session:
+        result = await session.post(
+            "https://governance.ownyourdata.eu/api/usage-policy/match",
+            json={
+                "data-subject": subject_usage_policy,
+                "data-controller": controller_usage_policy,
+            },
+        )
+        result = await result.text()
+        return result
 
 
 async def retrieve_service_issue(context, issue_id):

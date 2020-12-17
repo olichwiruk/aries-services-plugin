@@ -54,7 +54,7 @@ class DiscoveryResponseSchema(AgentMessageSchema):
         model_class = DiscoveryResponse
 
     services = fields.List(
-        fields.Nested(DiscoveryServiceSchema()),
+        fields.Dict(),
         required=True,
     )
 

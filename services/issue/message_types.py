@@ -35,6 +35,7 @@ Application, ApplicationSchema = generate_model_schema(
         "service_user_data_dri": fields.Str(required=True),
         "service_consent_match_id": fields.Str(required=True),
         "consent_credential": fields.Str(required=True),
+        "public_did": fields.Str(required=True),
     },
 )
 
@@ -55,15 +56,6 @@ Confirmation, ConfirmationSchema = generate_model_schema(
     schema={
         "exchange_id": fields.Str(required=True),
         "state": fields.Str(required=True),
-    },
-)
-
-GetIssue, GetIssueSchema = generate_model_schema(
-    name="GetIssue",
-    handler=f"{PROTOCOL_PACKAGE}.GetIssueHandler",
-    msg_type=GET_ISSUE,
-    schema={
-        "exchange_id": fields.Str(required=True),
     },
 )
 
