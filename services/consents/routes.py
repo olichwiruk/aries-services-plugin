@@ -16,8 +16,9 @@ CONSENTS_TABLE = "consents"
 
 class AddConsentSchema(Schema):
     label = fields.Str(required=True)
-    oca_schema = fields.Nested(OcaSchema())
-    payload = fields.Dict(required=True)
+    oca_data = fields.Dict(required=True)
+    oca_schema_dri = fields.Str(required=True)
+    oca_schema_namespace = fields.Str(required=True)
 
 
 @request_schema(AddConsentSchema())
@@ -41,7 +42,7 @@ async def add_consent(request: web.BaseRequest):
         return web.json_response({"success": False, "errors": errors})
     else:
         metadata = {
-            "oca_schema_dri": params["oca_schema"]["dri"],
+            "oca_schema_dri": params["oca_schema_dri"],
             "table": CONSENTS_TABLE,
         }
 
@@ -50,23 +51,24 @@ async def add_consent(request: web.BaseRequest):
         """
 
         schema = {}
-        consent_user_data = params["payload"]
+        consent_user_data = params["oca_data"]
 
-        payload_dri = await save_string(
+        oca_data_dri = await save_string(
             context, json.dumps(consent_user_data), json.dumps(metadata)
         )
 
         defined_consent = DefinedConsentRecord(
             label=params["label"],
-            oca_schema=params["oca_schema"],
-            payload_dri=payload_dri,
+            oca_schema_dri=params["oca_schema_dri"],
+            oca_schema_namespace=params["oca_schema_namespace"],
+            oca_data_dri=oca_data_dri,
         )
 
         consent_id = await defined_consent.save(context)
 
-        schema["oca_schema_dri"] = params["oca_schema"]["dri"]
-        schema["oca_schema_namespace"] = params["oca_schema"]["namespace"]
-        schema["data_dri"] = payload_dri
+        schema["oca_schema_dri"] = params["oca_schema_dri"]
+        schema["oca_schema_namespace"] = params["oca_schema_namespace"]
+        schema["oca_data_dri"] = oca_data_dri
 
         return web.json_response(
             {"success": True, "schema": schema, "consent_id": consent_id}
@@ -84,11 +86,11 @@ async def get_consents(request: web.BaseRequest):
 
     result = list(map(lambda el: el.record_value, all_consents))
     for consent in result:
-        payload = await load_string(context, consent["payload_dri"])
-        if payload:
-            consent["payload"] = json.loads(payload)
+        oca_data = await load_string(context, consent["oca_data_dri"])
+        if oca_data:
+            consent["oca_data"] = json.loads(oca_data)
         else:
-            consent["payload"] = None
+            consent["oca_data"] = None
 
     return web.json_response({"success": True, "result": result})
 

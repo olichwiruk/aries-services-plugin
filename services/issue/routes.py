@@ -56,12 +56,6 @@ async def get_public_did(context):
 @docs(
     tags=["Verifiable Services"],
     summary="Apply to a service that connected agent provides",
-    description="""
-    "connection_id" - id of a already established connection with some other agent.
-    "service" - you can get that by requesting a list of services from a already
-    connected agent.
-    "payload" - your data.
-    """,
 )
 @request_schema(ApplySchema())
 async def apply(request: web.BaseRequest):
@@ -84,11 +78,13 @@ async def apply(request: web.BaseRequest):
     service_consent_match_id = str(uuid.uuid4())
 
     """
+
     Pop the usage policy of service provider and bring our policy to
     credential
+
     """
     service_consent_copy = service_consent_schema.copy()
-    service_consent_copy.pop("data", None)
+    service_consent_copy.pop("oca_data", None)
     usage_policy = await pds_get_usage_policy_if_active_pds_supports_it(context)
     credential_values = {"service_consent_match_id": service_consent_match_id}
     credential_values["usage_policy"] = usage_policy
@@ -148,15 +144,13 @@ async def apply(request: web.BaseRequest):
 
     """
 
-    record the given credential
+    Record the given credential
 
     """
 
     consent_given_record = ConsentGivenRecord(
-        consent_user_data_dri=service_consent_schema["data_dri"],
         connection_id=connection_id,
         credential=credential,
-        service_consent_match_id=service_consent_match_id,
     )
 
     await consent_given_record.save(context)
@@ -231,7 +225,7 @@ async def process_application(request: web.BaseRequest):
             "credential_values": {
                 "oca_schema_dri": service.service_schema["oca_schema_dri"],
                 "oca_schema_namespace": service.service_schema["oca_schema_namespace"],
-                "data_dri": issue.service_user_data_dri,
+                "oca_data_dri": issue.service_user_data_dri,
                 "service_consent_match_id": issue.service_consent_match_id,
             }
         },
@@ -271,7 +265,9 @@ async def serialize_and_verify_service_issue(context, issue):
 
     service_user_data = await load_string(context, issue.service_user_data_dri)
     service: ServiceRecord = await retrieve_service(context, issue.service_id)
-    consent_data = await load_string(context, service.consent_schema.get("data_dri"))
+    consent_data = await load_string(
+        context, service.consent_schema.get("oca_data_dri")
+    )
     consent_data = json.loads(consent_data)
 
     if consent_data.get("usage_policy") is not None:

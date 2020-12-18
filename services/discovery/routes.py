@@ -2,6 +2,7 @@ from aries_cloudagent.connections.models.connection_record import ConnectionReco
 from aries_cloudagent.messaging.valid import UUIDFour
 from aries_cloudagent.storage.error import StorageNotFoundError, StorageDuplicateError
 from aries_cloudagent.storage.base import BaseStorage
+from ..consents.models.defined_consent import *
 
 from aiohttp import web
 from aiohttp import ClientSession
@@ -42,8 +43,8 @@ class ConsentContentSchema(Schema):
 
 class AddServiceSchema(Schema):
     label = fields.Str(required=True)
+    consent_id = fields.Str(required=True)
     service_schema = fields.Nested(ServiceSchema())
-    consent_schema = fields.Nested(ConsentSchema())
 
 
 @request_schema(AddServiceSchema())
@@ -51,11 +52,14 @@ class AddServiceSchema(Schema):
 async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
+    record = await DefinedConsentRecord.routes_retrieve_by_id_serialized(
+        context, params["consent_id"]
+    )
 
     service_record = ServiceRecord(
         label=params["label"],
         service_schema=params["service_schema"],
-        consent_schema=params["consent_schema"],
+        consent_schema=record,
     )
 
     try:

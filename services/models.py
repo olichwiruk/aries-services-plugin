@@ -22,8 +22,8 @@ class ConsentSchema(Schema):
     # dri - decentralized resource identifier
     oca_schema_dri = fields.Str(required=False)
     oca_schema_namespace = fields.Str(required=False)
-    data_dri = fields.Str(required=False)
-    data = fields.Dict()
+    oca_data_dri = fields.Str(required=False)
+    oca_data = fields.Dict()
 
 
 class ServiceSchema(Schema):

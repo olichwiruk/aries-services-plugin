@@ -89,11 +89,11 @@ class ApplicationHandler(BaseHandler):
         """
         namespace = service.consent_schema["oca_schema_namespace"]
         oca_dri = service.consent_schema["oca_schema_dri"]
-        data_dri = service.consent_schema["data_dri"]
+        data_dri = service.consent_schema["oca_data_dri"]
         cred_content = consent["credentialSubject"]
 
         is_malformed = (
-            cred_content["data_dri"] != data_dri
+            cred_content["oca_data_dri"] != data_dri
             or cred_content["oca_schema_namespace"] != namespace
             or cred_content["oca_schema_dri"] != oca_dri
         )
@@ -124,7 +124,7 @@ class ApplicationHandler(BaseHandler):
             raise HandlerException(
                 f"Ismalformed? {is_malformed} Incoming consent"
                 f"credential doesn't match with service consent credential"
-                f"Conditions: data dri {cred_content['data_dri'] != data_dri} "
+                f"Conditions: data dri {cred_content['oca_data_dri'] != data_dri} "
                 f"namespace {cred_content['oca_schema_namespace'] != namespace} "
                 f"oca_dri {cred_content['oca_schema_dri'] != oca_dri}"
             )
@@ -221,7 +221,7 @@ class ApplicationResponseHandler(BaseHandler):
         is_malformed = (
             subject["oca_schema_dri"] != promised_oca_dri
             or subject["oca_schema_namespace"] != promised_namespace
-            or subject["data_dri"] != promised_data_dri
+            or subject["oca_data_dri"] != promised_data_dri
             or subject["service_consent_match_id"] != promised_conset_match
         )
 

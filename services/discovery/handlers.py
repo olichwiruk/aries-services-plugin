@@ -42,8 +42,10 @@ async def get_serialized_services(context):
         record = DiscoveryServiceSchema()
 
         consent_schema = service.consent_schema
-        consent_schema_data = await load_string(context, consent_schema.get("data_dri"))
-        consent_schema["data"] = json.loads(consent_schema_data)
+        consent_schema_data = await load_string(
+            context, consent_schema.get("oca_data_dri")
+        )
+        consent_schema["oca_data"] = json.loads(consent_schema_data)
 
         record = {
             "service_schema": service.service_schema,
@@ -82,7 +84,7 @@ class DiscoveryResponseHandler(BaseHandler):
         for i in services:
             result = {}
             result[i["service_id"]] = await verify_usage_policy(
-                usage_policy, i["consent_schema"]["data"]["usage_policy"]
+                usage_policy, i["consent_schema"]["oca_data"]["usage_policy"]
             )
             await responder.send_webhook(
                 "verifiable-services/request-service-list/usage-policy",
