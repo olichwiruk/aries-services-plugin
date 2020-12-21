@@ -263,7 +263,6 @@ async def serialize_and_verify_service_issue(context, issue):
     by default (information that is in PDS)
     """
 
-    service_user_data = await load_string(context, issue.service_user_data_dri)
     service = await ServiceRecord.retrieve_by_id_fully_serialized(
         context, issue.service_id
     )
@@ -272,10 +271,11 @@ async def serialize_and_verify_service_issue(context, issue):
     if consent_data.get("usage_policy") is not None:
         if issue.author == ServiceIssueRecord.AUTHOR_OTHER:
             record["usage_policies_match"] = await verify_usage_policy(
-                consent_data["usage_policy"],
                 issue.user_consent_credential["credentialSubject"]["usage_policy"],
+                consent_data["usage_policy"],
             )
 
+    service_user_data = await load_string(context, issue.service_user_data_dri)
     record.update(
         {
             "issue_id": issue._id,
