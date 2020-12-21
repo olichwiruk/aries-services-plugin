@@ -6,7 +6,6 @@ import json
 
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.storage.error import StorageError
-from ..models import OcaSchema
 from .models.defined_consent import *
 from .models.given_consent import ConsentGivenRecord
 from ..models import ConsentSchema
@@ -50,11 +49,8 @@ async def add_consent(request: web.BaseRequest):
         If pds supports usage policy then pack it into consent
         """
 
-        schema = {}
-        consent_user_data = params["oca_data"]
-
         oca_data_dri = await save_string(
-            context, json.dumps(consent_user_data), json.dumps(metadata)
+            context, json.dumps(params["oca_data"]), json.dumps(metadata)
         )
 
         defined_consent = DefinedConsentRecord(
@@ -66,13 +62,7 @@ async def add_consent(request: web.BaseRequest):
 
         consent_id = await defined_consent.save(context)
 
-        schema["oca_schema_dri"] = params["oca_schema_dri"]
-        schema["oca_schema_namespace"] = params["oca_schema_namespace"]
-        schema["oca_data_dri"] = oca_data_dri
-
-        return web.json_response(
-            {"success": True, "schema": schema, "consent_id": consent_id}
-        )
+        return web.json_response({"success": True, "consent_id": consent_id})
 
 
 @docs(tags=["Defined Consents"], summary="Get all consent definitions")

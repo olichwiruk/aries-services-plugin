@@ -1,7 +1,6 @@
 from aries_cloudagent.messaging.models.base_record import BaseRecord, BaseRecordSchema
 from marshmallow import fields
 
-from ...models import OcaSchema
 from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.pdstorage_thcf.error import *
 import json
@@ -56,13 +55,16 @@ class DefinedConsentRecord(BaseRecord):
         record = await cls.retrieve_by_id(context, id)
         oca_data = await load_string(context, record.oca_data_dri)
 
-        oca_data = json.loads(oca_data)
         record = record.serialize()
-        record["oca_data"] = oca_data
+        record["oca_data"] = json.loads(oca_data)
+        record.pop("created_at", None)
+        record.pop("updated_at", None)
+        record.pop("label", None)
+
         return record
 
     @classmethod
-    async def routes_retrieve_defined_consent_fully_serialized(cls, context, id):
+    async def routes_retrieve_by_id_fully_serialized(cls, context, id):
         try:
             record = await cls.retrieve_by_id_fully_serialized(context, id)
         except PersonalDataStorageNotFoundError as err:
@@ -85,12 +87,12 @@ class DefinedConsentRecord(BaseRecord):
         except StorageError as err:
             raise web.HTTPInternalServerError(reason=err)
 
-        result = record.serialize()
-        result.pop("created_at", None)
-        result.pop("updated_at", None)
-        result.pop("label", None)
+        record = record.serialize()
+        record.pop("created_at", None)
+        record.pop("updated_at", None)
+        record.pop("label", None)
 
-        return result
+        return record
 
 
 class DefinedConsentRecordSchema(BaseRecordSchema):

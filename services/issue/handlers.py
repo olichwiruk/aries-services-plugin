@@ -70,10 +70,13 @@ class ApplicationHandler(BaseHandler):
         consent = json.loads(consent, object_pairs_hook=OrderedDict)
 
         try:
-            service: ServiceRecord = await ServiceRecord.retrieve_by_id(
-                context, context.message.service_id
+            service: ServiceRecord = (
+                await ServiceRecord.retrieve_by_id_fully_serialized(
+                    context, context.message.service_id
+                )
             )
-        except StorageNotFoundError:
+        except StorageNotFoundError as err:
+            LOGGER.warn(err)
             await send_confirmation(
                 context,
                 responder,
@@ -87,9 +90,9 @@ class ApplicationHandler(BaseHandler):
         Verify consent against these three vars from service requirements
 
         """
-        namespace = service.consent_schema["oca_schema_namespace"]
-        oca_dri = service.consent_schema["oca_schema_dri"]
-        data_dri = service.consent_schema["oca_data_dri"]
+        namespace = service["consent_schema"]["oca_schema_namespace"]
+        oca_dri = service["consent_schema"]["oca_schema_dri"]
+        data_dri = service["consent_schema"]["oca_data_dri"]
         cred_content = consent["credentialSubject"]
 
         is_malformed = (
@@ -103,7 +106,7 @@ class ApplicationHandler(BaseHandler):
         """
 
         # usage_policy_message = await verify_usage_policy(
-        #     service.consent_schema["usage_policy"],
+        #     service["consent_schema"]["usage_policy"],
         #     consent["credentialSubject"]["usage_policy"],
         # )
         # if usage_policy_message.find("policies match") == -1:
@@ -160,10 +163,10 @@ class ApplicationHandler(BaseHandler):
             service_id=context.message.service_id,
             service_consent_match_id=context.message.service_consent_match_id,
             service_user_data_dri=user_data_dri,
-            service_schema=service.service_schema,
-            service_consent_schema=service.consent_schema,
+            service_schema=service["service_schema"],
+            service_consent_schema=service["consent_schema"],
             user_consent_credential=consent,
-            label=service.label,
+            label=service["label"],
             their_public_did=context.message.public_did,
         )
 

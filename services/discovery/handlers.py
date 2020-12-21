@@ -34,38 +34,21 @@ from aries_cloudagent.pdstorage_thcf.api import *
 from aries_cloudagent.aathcf.utils import debug_handler
 
 
-async def get_serialized_services(context):
-    query = await ServiceRecord().query(context)
-
-    records = []
-    for service in query:
-        record = DiscoveryServiceSchema()
-
-        consent_schema = service.consent_schema
-        consent_schema_data = await load_string(
-            context, consent_schema.get("oca_data_dri")
-        )
-        consent_schema["oca_data"] = json.loads(consent_schema_data)
-
-        record = {
-            "service_schema": service.service_schema,
-            "consent_schema": consent_schema,
-            "service_id": service._id,
-            "label": service.label,
-        }
-        records.append(record)
-
-    return records
-
-
 class DiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, Discovery)
 
-        records = await get_serialized_services(context)
+        records = await ServiceRecord().query_fully_serialized(context)
         response = DiscoveryResponse(services=records)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)
+
+
+def trim_acapy_fields(list_of_dict):
+    for i in list_of_dict:
+        i.pop("created_at", None)
+        i.pop("updated_at", None)
+        i.pop("consent_id", None)
 
 
 class DiscoveryResponseHandler(BaseHandler):
@@ -74,6 +57,7 @@ class DiscoveryResponseHandler(BaseHandler):
         connection_id = context.connection_record.connection_id
 
         services = context.message.services
+        trim_acapy_fields(services)
 
         await responder.send_webhook(
             "verifiable-services/request-service-list",
@@ -152,7 +136,7 @@ class DEBUGDiscoveryHandler(BaseHandler):
     async def handle(self, context: RequestContext, responder: BaseResponder):
         debug_handler(self._logger.debug, context, DEBUGDiscovery)
 
-        records = await get_serialized_services(context)
+        records = await ServiceRecord().query_fully_serialized(context)
         response = DEBUGDiscoveryResponse(services=records)
         response.assign_thread_from(context.message)
         await responder.send_reply(response)
@@ -163,14 +147,17 @@ class DEBUGDiscoveryResponseHandler(BaseHandler):
         debug_handler(self._logger.debug, context, DEBUGDiscoveryResponse)
         connection_id = context.connection_record.connection_id
 
+        services = context.message.services
+        trim_acapy_fields(services)
+
         try:
             record = await DEBUGServiceDiscoveryRecord.retrieve_by_connection_id(
                 context, connection_id
             )
-            record.services = context.message.services
+            record.services = services
         except StorageNotFoundError:
             record: DEBUGServiceDiscoveryRecord = DEBUGServiceDiscoveryRecord(
-                services=context.message.services,
+                services=services,
                 connection_id=connection_id,
             )
 

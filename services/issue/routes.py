@@ -264,11 +264,10 @@ async def serialize_and_verify_service_issue(context, issue):
     """
 
     service_user_data = await load_string(context, issue.service_user_data_dri)
-    service: ServiceRecord = await retrieve_service(context, issue.service_id)
-    consent_data = await load_string(
-        context, service.consent_schema.get("oca_data_dri")
+    service = await ServiceRecord.retrieve_by_id_fully_serialized(
+        context, issue.service_id
     )
-    consent_data = json.loads(consent_data)
+    consent_data = service["consent_schema"]["oca_data"]
 
     if consent_data.get("usage_policy") is not None:
         if issue.author == ServiceIssueRecord.AUTHOR_OTHER:

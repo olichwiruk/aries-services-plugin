@@ -19,20 +19,6 @@ from ..models import *
 from .message_types import *
 from .handlers import *
 
-# debug
-
-# from aries_cloudagent.wallet.base import BaseWallet
-# from aries_cloudagent.wallet.http import HttpWallet
-# from aries_cloudagent.wallet.basic import BasicWallet
-
-# DATA_VAULT = "https://data-vault.argo.colossi.network/api/v1/files/"
-# CONSENT_EXAMPLE = {
-#     "expiration": "3600",
-#     "limitation": "3600",
-#     "dictatedBy": "somebody",
-#     "validityTTL": "3600",
-# }
-
 
 class ConsentContentSchema(Schema):
     expiration = fields.Str(required=True)
@@ -52,22 +38,19 @@ class AddServiceSchema(Schema):
 async def add_service(request: web.BaseRequest):
     context = request.app["request_context"]
     params = await request.json()
-    record = await DefinedConsentRecord.routes_retrieve_by_id_serialized(
-        context, params["consent_id"]
-    )
 
     service_record = ServiceRecord(
         label=params["label"],
         service_schema=params["service_schema"],
-        consent_schema=record,
+        consent_id=params["consent_id"],
     )
 
     try:
         hash_id = await service_record.save(context)
     except StorageDuplicateError:
-        service_record = ServiceRecord().retrieve_by_id(context)
+        raise web.HTTPBadRequest(reason="Duplicate. Consent already defined.")
 
-    return web.json_response({"service_id": hash_id})
+    return web.json_response({"success": True, "service_id": hash_id})
 
 
 @docs(
@@ -84,15 +67,20 @@ async def request_services_list(request: web.BaseRequest):
         connection: ConnectionRecord = await ConnectionRecord.retrieve_by_id(
             context, connection_id
         )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound
+    except StorageNotFoundError as err:
+        raise web.HTTPNotFound(reason=err)
 
     if connection.is_ready:
         request = Discovery()
         await outbound_handler(request, connection_id=connection_id)
-        return web.json_response("SUCCESS: request sent, expect a webhook notification")
+        return web.json_response(
+            {
+                "success": True,
+                "message": "SUCCESS: request sent, expect a webhook notification",
+            }
+        )
 
-    raise web.HTTPNotFound
+    raise web.HTTPNotFound("Connection with agent is not ready. ")
 
 
 @docs(
@@ -103,17 +91,11 @@ async def self_service_list(request: web.BaseRequest):
     context = request.app["request_context"]
 
     try:
-        query = await ServiceRecord().query(context)
+        result = await ServiceRecord().query_fully_serialized(context)
     except StorageNotFoundError:
         raise web.HTTPNotFound
 
-    result = []
-    for service in query:
-        service_json = service.serialize()
-        service_json.update({"service_id": service._id})
-        result.append(service_json)
-
-    return web.json_response(result)
+    return web.json_response({"success": True, "result": result})
 
 
 async def DEBUGrequest_services_list(request: web.BaseRequest):
