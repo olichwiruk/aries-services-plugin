@@ -299,8 +299,8 @@ async def get_issue_self(request: web.BaseRequest):
             if i.author == ServiceIssueRecord.AUTHOR_OTHER:
                 print(i.consent_credential)
                 record["usage_policies_match"] = await verify_usage_policy(
-                    i.consent_schema["usage_policy"],
                     i.consent_credential["credentialSubject"]["usage_policy"],
+                    i.consent_schema["usage_policy"],
                 )
 
         record.update(
